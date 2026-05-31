@@ -38,7 +38,7 @@ export default function TaskDashboard({ user }: { user: { name: string; picture?
       <header className="bg-gray-900 border-b border-gray-800 px-6 py-4 flex justify-between items-center">
         <div className="flex items-center gap-3">
         <h1 className="text-xl font-bold text-white">GershonCRM — Tasks</h1>
-        <span className="inline-block bg-white text-indigo-700 font-bold text-xs px-2.5 py-1 rounded-full shadow tracking-wide">v{pkg.version}</span>>
+        <span className="inline-block bg-white text-indigo-700 font-bold text-xs px-2.5 py-1 rounded-full shadow tracking-wide">v{pkg.version}</span>
         </div>
         <div className="flex items-center gap-3">
           {user.picture && <img src={user.picture} className="w-8 h-8 rounded-full" />}
