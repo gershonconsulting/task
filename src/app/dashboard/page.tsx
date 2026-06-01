@@ -7,7 +7,7 @@ import { sessionOptions, SessionData } from '@/lib/session'
 import TaskDashboard from '@/components/TaskDashboard'
 
 export default async function DashboardPage() {
-  const session = await getIronSession<SessionData>(cookies(), sessionOptions)
-  if (!session.user) redirect('/')
-  return <TaskDashboard user={session.user} />
+    const session = await getIronSession<SessionData>(await cookies(), sessionOptions)
+    if (!session.user) redirect('/')
+    return <TaskDashboard user={session.user} />
 }
