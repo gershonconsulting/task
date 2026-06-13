@@ -14,3 +14,4 @@ Task management app at task.gershoncrm.com with LinkedIn OIDC authentication.
 ## Deploy
 Push to `main` → GitHub Actions builds and FTP deploys to Hostinger.
 Required secrets: `FTP_SERVER`, `FTP_USERNAME`, `FTP_PASSWORD`, `FTP_SERVER_DIR`
+
