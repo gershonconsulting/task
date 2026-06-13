@@ -1,13 +1,12 @@
-export const runtime = 'edge'
+// The LinkedIn callback redirects here. We just bounce through the smart router
+// at / which already handles team vs client vs guest.
+// Keeping this file (rather than removing it) avoids needing to also edit the
+// auth callback route, which lives elsewhere.
 
-import { getIronSession } from 'iron-session'
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
-import { sessionOptions, SessionData } from '@/lib/session'
-import TaskDashboard from '@/components/TaskDashboard'
+import { redirect } from 'next/navigation';
 
-export default async function DashboardPage() {
-    const session = await getIronSession<SessionData>(await cookies(), sessionOptions)
-    if (!session.user) redirect('/')
-    return <TaskDashboard user={session.user} />
+export const runtime = 'edge';
+
+export default function DashboardLanding(): never {
+  redirect('/');
 }
