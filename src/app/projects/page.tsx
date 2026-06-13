@@ -7,7 +7,7 @@ import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { sessionOptions, type SessionData } from '@/lib/session';
 import { resolveTeamRole, canSeeAllProjects } from '@/lib/roles';
-import { supabaseAdmin, type ProjectProgressRow } from '@/lib/supabaseServer';
+import { type ProjectProgressRow } from '@/lib/supabaseServer';
 import { getTemplate } from '@/lib/templates';
 import AppHeader from '@/components/AppHeader';
 
@@ -19,25 +19,40 @@ export default async function ProjectsPage() {
 
   const role = resolveTeamRole(session.user.email);
   if (role.kind === 'guest') redirect('/login?error=not_allowlisted');
-  if (!canSeeAllProjects(role)) {
-    // Client — find their project and redirect to it
-    const supa = supabaseAdmin();
-    const { data } = await supa
-      .from('projects')
-      .select('id')
-      .eq('client_email', session.user.email)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (data?.id) redirect(`/projects/${data.id}`);
-    redirect('/login?error=not_allowlisted');
-  }
 
-  // Team/admin: list everything
-  const { data: rows, error } = await supabaseAdmin()
-    .from('project_progress')
-    .select('*')
-    .order('updated_at', { ascending: false });
+  // Lazy-import supabaseAdmin so a missing env var gives a clear error message
+  // rather than a cryptic server crash.
+  let rows: ProjectProgressRow[] | null = null;
+  let dbError: string | null = null;
+
+  try {
+    const { supabaseAdmin } = await import('@/lib/supabaseServer');
+
+    if (!canSeeAllProjects(role)) {
+      // Client — find their project and redirect to it
+      const supa = supabaseAdmin();
+      const { data } = await supa
+        .from('projects')
+        .select('id')
+        .eq('client_email', session.user.email)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data?.id) redirect(`/projects/${data.id}`);
+      redirect('/login?error=not_allowlisted');
+    }
+
+    // Team/admin: list everything
+    const { data, error } = await supabaseAdmin()
+      .from('project_progress')
+      .select('*')
+      .order('updated_at', { ascending: false });
+
+    if (error) dbError = error.message;
+    else rows = data as ProjectProgressRow[];
+  } catch (e: unknown) {
+    dbError = e instanceof Error ? e.message : String(e);
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -49,13 +64,14 @@ export default async function ProjectsPage() {
           user={{ name: session.user.name, role: role.kind }}
         />
 
-        {error && (
+        {dbError && (
           <div className="mb-6 p-4 rounded-md bg-red-50 border border-red-200 text-red-800 text-sm">
-            Failed to load projects: {error.message}
+            <strong>Database error:</strong> {dbError}
+            <p className="mt-1 text-xs text-red-600">Check that SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in your Cloudflare Pages environment variables.</p>
           </div>
         )}
 
-        {!error && rows && rows.length === 0 && (
+        {!dbError && rows && rows.length === 0 && (
           <div className="text-center py-16 bg-white rounded-lg border border-dashed border-slate-300">
             <p className="text-slate-500 mb-4">No projects yet.</p>
             <Link
@@ -67,9 +83,9 @@ export default async function ProjectsPage() {
           </div>
         )}
 
-        {!error && rows && rows.length > 0 && (
+        {!dbError && rows && rows.length > 0 && (
           <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {(rows as ProjectProgressRow[]).map((r) => (
+            {rows.map((r) => (
               <ProjectCard key={r.project_id} row={r} />
             ))}
           </ul>
