@@ -1,16 +1,24 @@
-export default function Home() {
-  return (
-    <main className="min-h-screen bg-gray-950 flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-white mb-2">GershonCRM</h1>
-        <p className="text-gray-400 mb-8">Task Manager</p>
-        <a
-          href="/api/auth/linkedin/login"
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 rounded-lg transition"
-        >
-          Sign in with LinkedIn
-        </a>
-      </div>
-    </main>
-  )
+import { redirect } from 'next/navigation';
+import { getIronSession } from 'iron-session';
+import { cookies } from 'next/headers';
+import { sessionOptions, type SessionData } from '@/lib/session';
+import { resolveTeamRole, canSeeAllProjects } from '@/lib/roles';
+import { supabaseAdmin } from '@/lib/supabaseServer';
+
+export const runtime = 'edge';
+
+export default async function Home() {
+  const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
+  if (!session.user) redirect('/login');
+  const role = resolveTeamRole(session.user.email);
+  if (canSeeAllProjects(role)) redirect('/projects');
+  const { data } = await supabaseAdmin()
+    .from('projects')
+    .select('id')
+    .eq('client_email', session.user.email)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (data?.id) redirect(`/projects/${data.id}`);
+  redirect('/login?error=not_allowlisted');
 }
