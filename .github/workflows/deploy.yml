@@ -33,11 +33,15 @@ jobs:
           LINKEDIN_CLIENT_ID: ${{ secrets.LINKEDIN_CLIENT_ID }}
           LINKEDIN_CLIENT_SECRET: ${{ secrets.LINKEDIN_CLIENT_SECRET }}
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          echo "$LINKEDIN_CLIENT_ID" | npx wrangler pages secret put LINKEDIN_CLIENT_ID --project-name gershon-task
-          echo "$LINKEDIN_CLIENT_SECRET" | npx wrangler pages secret put LINKEDIN_CLIENT_SECRET --project-name gershon-task
-          echo "$SESSION_SECRET" | npx wrangler pages secret put SESSION_SECRET --project-name gershon-task
-          printf 'https://task.gershoncrm.com' | npx wrangler pages secret put NEXT_PUBLIC_SITE_URL --project-name gershon-task
+          echo "$LINKEDIN_CLIENT_ID"        | npx wrangler pages secret put LINKEDIN_CLIENT_ID        --project-name gershon-task
+          echo "$LINKEDIN_CLIENT_SECRET"    | npx wrangler pages secret put LINKEDIN_CLIENT_SECRET    --project-name gershon-task
+          echo "$SESSION_SECRET"            | npx wrangler pages secret put SESSION_SECRET            --project-name gershon-task
+          printf 'https://task.gershoncrm.com' | npx wrangler pages secret put NEXT_PUBLIC_SITE_URL  --project-name gershon-task
+          echo "$SUPABASE_URL"              | npx wrangler pages secret put SUPABASE_URL              --project-name gershon-task
+          echo "$SUPABASE_SERVICE_ROLE_KEY" | npx wrangler pages secret put SUPABASE_SERVICE_ROLE_KEY --project-name gershon-task
 
       - name: Deploy to Cloudflare Pages
         run: npx wrangler pages deploy .vercel/output/static --project-name gershon-task --commit-dirty=true
