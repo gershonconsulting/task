@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
-import { sessionOptions, type SessionData } from '@/lib/session';
+import { getSessionOptions, type SessionData } from '@/lib/session';
 import { resolveTeamRole, canSeeAllProjects } from '@/lib/roles';
 import { type ProjectProgressRow } from '@/lib/supabaseServer';
 import { getTemplate } from '@/lib/templates';
@@ -14,7 +14,7 @@ import AppHeader from '@/components/AppHeader';
 export const runtime = 'edge';
 
 export default async function ProjectsPage() {
-  const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
+    const session = await getIronSession<SessionData>(await cookies(), getSessionOptions());
   if (!session.user) redirect('/login');
 
   const role = resolveTeamRole(session.user.email);
