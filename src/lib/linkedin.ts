@@ -8,14 +8,14 @@ function getEnv(key: string): string {
         }
 }
 
-export async function exchangeCode(code: string): Promise<string> {
+export async function exchangeCode(code: string, redirectUri: string): Promise<string> {
         const res = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: new URLSearchParams({
                                     grant_type: 'authorization_code',
                                     code,
-                                    redirect_uri: `${getEnv('NEXT_PUBLIC_SITE_URL')}/api/auth/linkedin/callback`,
+                        redirect_uri: redirectUri,
                                     client_id: getEnv('LINKEDIN_CLIENT_ID'),
                                     client_secret: getEnv('LINKEDIN_CLIENT_SECRET'),
                     }),
