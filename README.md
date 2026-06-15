@@ -1,8 +1,11 @@
 # GershonCRM Task Manager (v0.2.0)
 
+
 Task management app at task.gershoncrm.com with LinkedIn OIDC authentication.
 
+
 ## Stack
+
 
 - Next.js 14, TypeScript, Tailwind CSS
 - - iron-session for auth sessions
@@ -19,3 +22,5 @@ Task management app at task.gershoncrm.com with LinkedIn OIDC authentication.
             
              4. Push to `main` → GitHub Actions builds and deploys to Cloudflare Pages.
              5. Required secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`, `SESSION_SECRET`, `NEXT_PUBLIC_SITE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
+
+
