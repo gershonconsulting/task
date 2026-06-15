@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
-import { sessionOptions, type SessionData } from '@/lib/session';
+import { getSessionOptions, type SessionData } from '@/lib/session';
 import { resolveTeamRole, canCreateProject } from '@/lib/roles';
 import { createProjectFromTemplate } from '@/lib/projectCreate';
 import { getTemplate } from '@/lib/templates';
@@ -19,7 +19,7 @@ export async function createProjectAction(
   formData: FormData,
 ): Promise<CreateActionResult> {
   // 1. Auth
-  const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
+    const session = await getIronSession<SessionData>(await cookies(), getSessionOptions());
   if (!session.user) return { ok: false, error: 'Not signed in.' };
   const role = resolveTeamRole(session.user.email);
   if (!canCreateProject(role)) return { ok: false, error: 'Not authorized to create projects.' };
