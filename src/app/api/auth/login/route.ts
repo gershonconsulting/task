@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
   const adminPassword = getEnv('ADMIN_PASSWORD')
   if (!adminPassword) {
-    return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 })
+    return NextResponse.json({ error: 'Server misconfigured: missing ADMIN_PASSWORD' }, { status: 500 })
   }
 
   if (!isTeamEmail(email) || password !== adminPassword) {
