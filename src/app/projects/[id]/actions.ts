@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
-import { sessionOptions, type SessionData } from '@/lib/session';
+import { getSessionOptions, type SessionData } from '@/lib/session';
 import {
   resolveTeamRole,
   canSeeAllProjects,
@@ -15,7 +15,7 @@ import {
 import { supabaseAdmin } from '@/lib/supabaseServer';
 
 async function requireSessionAndAccess(projectId: string) {
-  const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
+      const session = await getIronSession<SessionData>(await cookies(), getSessionOptions());
   if (!session.user) throw new Error('Not signed in');
   const role = resolveTeamRole(session.user.email);
   if (role.kind === 'guest') {
