@@ -1,11 +1,9 @@
 'use client';
 
-import { useActionState, useState } from 'react';
-import { createProjectAction, type CreateActionResult } from './actions';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { TEMPLATES, type ProcessTemplate } from '@/lib/templates';
 
-// "Smart" grouping: 4 lifecycle buckets that map to how Olivier thinks about
-// engagements. Default selection is Client Onboarding (top of the first group).
 const GROUPS: { label: string; hint: string; slugs: string[] }[] = [
   {
     label: 'Setup & Lifecycle',
@@ -39,24 +37,49 @@ function groupedTemplates(): { label: string; hint: string; items: ProcessTempla
 }
 
 export default function NewProjectForm() {
-  const [state, formAction, pending] = useActionState<CreateActionResult | undefined, FormData>(
-    createProjectAction,
-    undefined,
-  );
+  const router = useRouter();
   const [templateSlug, setTemplateSlug] = useState<string>('client-onboarding');
   const [showMore, setShowMore] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const groups = groupedTemplates();
   const selected = TEMPLATES.find(t => t.slug === templateSlug);
 
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setPending(true);
+    const fd = new FormData(e.currentTarget);
+    const body: Record<string, string> = {};
+    fd.forEach((v, k) => { body[k] = String(v); });
+    body.templateSlug = templateSlug;
+    try {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        router.push(`/projects/${data.projectId}`);
+      } else {
+        setError(data.error ?? 'Failed to create project.');
+      }
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setPending(false);
+    }
+  }
+
   return (
-    <form action={formAction} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
       {/* Step 1 — grouped template picker */}
       <fieldset className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm">
         <legend className="px-2 text-xs uppercase tracking-wider font-bold text-indigo-700">
           1. Pick a template
         </legend>
-        <input type="hidden" name="templateSlug" value={templateSlug} />
         <div className="space-y-5 mt-2">
           {groups.map((g) => (
             <div key={g.label}>
@@ -88,7 +111,7 @@ export default function NewProjectForm() {
         </div>
       </fieldset>
 
-      {/* Step 2 — minimal client info: name + email */}
+      {/* Step 2 — minimal client info */}
       <fieldset className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm">
         <legend className="px-2 text-xs uppercase tracking-wider font-bold text-indigo-700">
           2. Name & email
@@ -109,20 +132,20 @@ export default function NewProjectForm() {
         {showMore && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-200">
             <Field name="clientFirstName" label="First name" />
-            <Field name="clientLastName"  label="Last name" />
-            <Field name="clientTitle"     label="Title" />
+            <Field name="clientLastName" label="Last name" />
+            <Field name="clientTitle" label="Title" />
             <Field name="clientLinkedinUrl" label="LinkedIn URL" placeholder="linkedin.com/in/…" />
-            <Field name="clientDomain"    label="Domain" placeholder="example.com" />
+            <Field name="clientDomain" label="Domain" placeholder="example.com" />
             <div />
             <Field name="startDate" label="Start date (defaults to today)" type="date" />
-            <Field name="endDate"   label="End date" type="date" />
+            <Field name="endDate" label="End date" type="date" />
           </div>
         )}
       </fieldset>
 
-      {state?.error && (
+      {error && (
         <div className="p-3 rounded-md bg-red-50 border border-red-200 text-red-800 text-sm">
-          {state.error}
+          {error}
         </div>
       )}
 
@@ -155,4 +178,4 @@ function Field({
       />
     </label>
   );
-}
+              }
