@@ -4,7 +4,7 @@
 import { redirect, notFound } from 'next/navigation';
 import { getIronSession } from 'iron-session';
 import { cookies } from 'next/headers';
-import { sessionOptions, type SessionData } from '@/lib/session';
+import { getSessionOptions, type SessionData } from '@/lib/session';
 import { resolveTeamRole, canSeeAllProjects, canDeleteProject } from '@/lib/roles';
 import { supabaseAdmin, type ProjectRow, type TaskRow } from '@/lib/supabaseServer';
 import { getTemplate } from '@/lib/templates';
@@ -18,7 +18,7 @@ export default async function ProjectDetailPage(props: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await props.params;
-  const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
+      const session = await getIronSession<SessionData>(await cookies(), getSessionOptions());
   if (!session.user) redirect('/login');
   const role = resolveTeamRole(session.user.email);
 
