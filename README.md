@@ -1,4 +1,4 @@
-# GershonCRM Task Manager
+# GershonCRM Task Manager (v0.2.0)
 
 Task management app at task.gershoncrm.com with LinkedIn OIDC authentication.
 
