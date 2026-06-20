@@ -10,15 +10,15 @@ function hexEncode(buf: ArrayBuffer): string {
     .join('');
 }
 
-function hexDecode(hex: string): Uint8Array {
+function hexDecode(hex: string): ArrayBuffer {
   const arr = new Uint8Array(hex.length / 2);
   for (let i = 0; i < arr.length; i++) {
     arr[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
   }
-  return arr;
+  return arr.buffer as ArrayBuffer;
 }
 
-async function derive(password: string, salt: Uint8Array): Promise<ArrayBuffer> {
+async function derive(password: string, salt: ArrayBuffer): Promise<ArrayBuffer> {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
     'raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']
@@ -30,10 +30,11 @@ async function derive(password: string, salt: Uint8Array): Promise<ArrayBuffer> 
 }
 
 export async function hashPassword(password: string): Promise<string> {
-  const salt = new Uint8Array(16);
-  crypto.getRandomValues(salt);
+  const saltView = new Uint8Array(16);
+  crypto.getRandomValues(saltView);
+  const salt = saltView.buffer as ArrayBuffer;
   const hash = await derive(password, salt);
-  return `pbkdf2:sha256:${ITERATIONS}:${hexEncode(salt.buffer)}:${hexEncode(hash)}`;
+  return `pbkdf2:sha256:${ITERATIONS}:${hexEncode(salt)}:${hexEncode(hash)}`;
 }
 
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
