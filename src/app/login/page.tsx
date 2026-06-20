@@ -1,12 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import pkg from '../../../package.json'
 
 export default function LoginPage() {
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -23,7 +21,7 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       })
       if (res.ok) {
-        router.push('/projects')
+        window.location.href = '/projects'
       } else {
         const data = await res.json()
         setError(data.error ?? 'Sign-in failed. Please try again.')
