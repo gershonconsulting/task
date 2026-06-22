@@ -1,26 +1,19 @@
-import { getIronSession } from 'iron-session'
-import { cookies } from 'next/headers'
-import { getSessionOptions, type SessionData } from '@/lib/session'
-import AppHeader from '@/components/AppHeader'
-import NewProjectForm from './NewProjectForm'
-
 export const runtime = 'edge'
 
-export default async function NewProjectPage() {
-  const session = await getIronSession<SessionData>(await cookies(), getSessionOptions())
-  const userName = session.user?.name ?? 'Guest'
+import { getCurrentUser } from '@/lib/currentUser'
+import AppShell from '@/components/AppShell'
+import NewProjectForm from './NewProjectForm'
 
+export default async function NewProjectPage() {
+  const user = await getCurrentUser()
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      <div className="max-w-4xl mx-auto px-6 py-8">
-        <AppHeader
-          title="New Project"
-          subtitle="Pick a template and fill in client info — tasks auto-populate"
-          back={{ href: '/projects', label: 'Projects' }}
-          user={{ name: userName, role: 'admin' }}
-        />
-        <NewProjectForm />
-      </div>
-    </div>
+    <AppShell
+      userName={user.name}
+      userRole={user.role}
+      pageTitle="New Project"
+      pageSubtitle="Pick a template and fill in client info — tasks auto-populate"
+    >
+      <NewProjectForm userName={user.name} userEmail={user.email} />
+    </AppShell>
   )
 }
