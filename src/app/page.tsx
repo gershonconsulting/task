@@ -1,3 +1,3 @@
 import { redirect } from 'next/navigation'
 export const runtime = 'edge'
-export default function Home() { redirect('/projects') }
+export default function RootPage() { redirect('/dashboard') }
