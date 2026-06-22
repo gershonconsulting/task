@@ -219,3 +219,12 @@ export const TEMPLATES: ProcessTemplate[] = [
 export function getTemplate(slug: string): ProcessTemplate | undefined {
   return TEMPLATES.find(t => t.slug === slug);
 }
+
+// Personal templates (inline to avoid circular imports)
+export const PERSONAL_TEMPLATES: import('./index').ProcessTemplate[] = [
+  { slug: 'personal-move', label: 'Move', icon: '📦', color: '#7C3AED', description: 'Personal relocation checklist.', tasks: [{ id: 'move-01', name: 'Find new place', assignedTo: null, priority: 'high', dueOffsetDays: 0 }, { id: 'move-02', name: 'Book movers', assignedTo: null, priority: 'high', dueOffsetDays: 7 }, { id: 'move-03', name: 'Pack boxes', assignedTo: null, priority: 'medium', dueOffsetDays: 14 }, { id: 'move-04', name: 'Notify utilities', assignedTo: null, priority: 'medium', dueOffsetDays: 10 }, { id: 'move-05', name: 'Update address', assignedTo: null, priority: 'medium', dueOffsetDays: 12 }, { id: 'move-06', name: 'Moving day', assignedTo: null, priority: 'high', dueOffsetDays: 21 }] },
+  { slug: 'personal-trip', label: 'Trip', icon: '✈️', color: '#0EA5E9', description: 'Travel planning checklist.', tasks: [{ id: 'trip-01', name: 'Choose destination', assignedTo: null, priority: 'high', dueOffsetDays: 0 }, { id: 'trip-02', name: 'Book flights', assignedTo: null, priority: 'high', dueOffsetDays: 1 }, { id: 'trip-03', name: 'Book accommodation', assignedTo: null, priority: 'high', dueOffsetDays: 2 }, { id: 'trip-04', name: 'Check passport / visa', assignedTo: null, priority: 'high', dueOffsetDays: 1 }, { id: 'trip-05', name: 'Pack', assignedTo: null, priority: 'medium', dueOffsetDays: 14 }] },
+  { slug: 'personal-generic', label: 'Personal project', icon: '🎯', color: '#10B981', description: 'Generic personal project.', tasks: [{ id: 'gen-01', name: 'Define goal', assignedTo: null, priority: 'high', dueOffsetDays: 0 }, { id: 'gen-02', name: 'Research', assignedTo: null, priority: 'medium', dueOffsetDays: 3 }, { id: 'gen-03', name: 'Execute', assignedTo: null, priority: 'high', dueOffsetDays: 7 }] },
+];
+export const ALL_TEMPLATES = [...TEMPLATES, ...PERSONAL_TEMPLATES];
+export function isPersonalTemplate(slug: string): boolean { return slug.startsWith('personal-'); }
