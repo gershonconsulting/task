@@ -10,15 +10,15 @@ interface SidebarProps {
 }
 
 const NAV = [
-  { href: '/dashboard',        label: 'Dashboard',        icon: '📊' },
-  { href: '/projects',         label: 'By Project',       icon: '📁' },
-  { href: '/clients',          label: 'By Client',        icon: '🏢' },
-  { href: '/tasks',            label: 'Tasks',            icon: '✅' },
-  { href: '/monthly-reports',  label: 'Monthly Reports',  icon: '📅' },
-  { href: '/tools',            label: 'By Tool',          icon: '🔧' },
-  { href: '/users',            label: 'By Provider',      icon: '👥' },
-  { href: '/stages',           label: 'By Stage',         icon: '📋' },
-  { href: '/reports',          label: 'Reports',          icon: '📄' },
+  { href: '/dashboard',       label: 'Dashboard',       icon: '📊' },
+  { href: '/projects',        label: 'By Project',      icon: '📁' },
+  { href: '/clients',         label: 'By Client',       icon: '🏢' },
+  { href: '/tasks',           label: 'Tasks',           icon: '✅' },
+  { href: '/monthly-reports', label: 'Monthly Reports', icon: '📅' },
+  { href: '/tools',           label: 'By Tool',         icon: '🔧' },
+  { href: '/users',           label: 'By Provider',     icon: '👥' },
+  { href: '/stages',          label: 'By Stage',        icon: '📋' },
+  { href: '/reports',         label: 'Reports',         icon: '📄' },
 ]
 
 export default function Sidebar({ userName, userRole }: SidebarProps) {
@@ -41,19 +41,13 @@ export default function Sidebar({ userName, userRole }: SidebarProps) {
             {item.label}
           </Link>
         ))}
-        {userRole === 'admin' && (
-          <Link href="/admin/users" className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition ${isActive('/admin/users') ? 'bg-white/15 text-white' : 'text-indigo-200 hover:bg-white/10 hover:text-white'}`}>
-            <span className="text-base">🔧</span>
-            Admin users
-          </Link>
-        )}
       </nav>
       <div className="px-5 py-4 border-t border-indigo-800">
         <div className="text-xs text-indigo-300 mb-0.5">Signed in as</div>
         <div className="text-sm font-semibold text-white truncate">{userName}</div>
         <div className="mt-3 flex gap-3 text-xs">
           <Link href="/settings" className="text-indigo-300 hover:text-white transition">Settings</Link>
-          <Link href="/login" className="text-indigo-300 hover:text-white transition">Switch user</Link>
+          <Link href="/settings" className="text-indigo-300 hover:text-white transition">Switch user</Link>
         </div>
       </div>
     </aside>
