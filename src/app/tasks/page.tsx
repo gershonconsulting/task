@@ -18,13 +18,17 @@ export default async function TasksPage({
   const { provider, status } = await searchParams
   const supa = supabaseAdmin()
 
-  const [{ data: tasks }, { data: projects }] = await Promise.all([
-    supa.from('tasks').select('id, name, status, assigned_to, due_date, priority, tool, project_id'),
+  // Use select('*') to handle missing columns (e.g. 'tool' before migration)
+  const [tasksResult, projectsResult] = await Promise.all([
+    supa.from('tasks').select('*'),
     supa.from('projects').select('id, company_name, client_email, template_slug'),
   ])
 
-  const allTasks = tasks ?? []
-  const projectMap = new Map((projects ?? []).map(p => [p.id, p]))
+  const allTasks = (tasksResult.data ?? []) as Array<{
+    id: string; name: string; status: string | null; assigned_to: string | null;
+    due_date: string | null; priority: string | null; tool?: string | null; project_id: string | null;
+  }>
+  const projectMap = new Map((projectsResult.data ?? []).map((p: { id: string; company_name: string; client_email: string; template_slug: string }) => [p.id, p]))
 
   // Filter
   let filtered = allTasks
@@ -130,7 +134,7 @@ export default async function TasksPage({
           <div className="divide-y divide-slate-50">
             {filtered.map(t => {
               const proj = projectMap.get(t.project_id ?? '')
-              const tpl = proj ? getTemplate(proj.template_slug) : undefined
+              const tpl = proj ? getTemplate((proj as { template_slug: string }).template_slug) : undefined
               const today = new Date().toISOString().slice(0, 10)
               const overdue = t.due_date && t.due_date < today && t.status !== 'completed'
               return (
@@ -167,9 +171,9 @@ export default async function TasksPage({
 
                   {/* Project link */}
                   {proj && (
-                    <Link href={"/projects/" + proj.id} className="text-xs text-slate-300 hover:text-indigo-500 shrink-0 hidden xl:flex items-center gap-1">
+                    <Link href={"/projects/" + (proj as { id: string }).id} className="text-xs text-slate-300 hover:text-indigo-500 shrink-0 hidden xl:flex items-center gap-1">
                       <span>{tpl?.icon ?? '📁'}</span>
-                      <span className="max-w-[100px] truncate">{proj.company_name}</span>
+                      <span className="max-w-[100px] truncate">{(proj as { company_name: string }).company_name}</span>
                     </Link>
                   )}
                 </div>
@@ -180,4 +184,4 @@ export default async function TasksPage({
       )}
     </AppShell>
   )
-}
+      }
