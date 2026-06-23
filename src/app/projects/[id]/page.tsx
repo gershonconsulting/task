@@ -3,7 +3,7 @@ export const runtime = 'edge'
 import { notFound } from 'next/navigation'
 import { getCurrentUser } from '@/lib/currentUser'
 import { supabaseAdmin, type ProjectRow, type TaskRow } from '@/lib/supabaseServer'
-import { getTemplate } from '@/lib/templates'
+import { getTemplate, DEFAULT_TOOLS } from '@/lib/templates'
 import AppShell from '@/components/AppShell'
 import TaskList from './TaskList'
 import { deleteProject } from './actions'
@@ -21,6 +21,13 @@ export default async function ProjectDetailPage(props: { params: Promise<{ id: s
   const { data: tasks } = await supa.from('tasks').select('*').eq('project_id', id).order('position', { ascending: true })
   const taskRows = (tasks ?? []) as TaskRow[]
 
+  // Load tools from app_settings (fall back to defaults if table not yet created)
+  let tools = DEFAULT_TOOLS
+  try {
+    const { data: setting } = await supa.from('app_settings').select('value').eq('key', 'tools').single()
+    if (setting?.value) tools = JSON.parse(setting.value)
+  } catch { /* use defaults */ }
+
   const tpl = getTemplate(p.template_slug)
   const total = taskRows.length
   const done = taskRows.filter(t => t.status === 'completed').length
@@ -31,11 +38,11 @@ export default async function ProjectDetailPage(props: { params: Promise<{ id: s
       userName={user.name}
       userRole={user.role}
       pageTitle={p.company_name}
-      pageSubtitle={`${tpl?.icon ?? ''} ${tpl?.label ?? p.template_slug} · ${p.status.replace('_', ' ')}`}
+      pageSubtitle={''+( tpl?.icon ?? '') + ' ' + (tpl?.label ?? p.template_slug) + ' · ' + p.status.replace('_', ' ')}
     >
       <div className="mb-4 flex items-center gap-4">
         <Link href="/projects" className="text-sm text-slate-500 hover:text-slate-700">← Projects</Link>
-        <Link href={`/projects/${id}/report`} className="ml-auto text-sm text-indigo-600 hover:text-indigo-800">Status report →</Link>
+        <Link href={'/projects/' + id + '/report'} className="ml-auto text-sm text-indigo-600 hover:text-indigo-800">Status report →</Link>
       </div>
 
       <section className="bg-white rounded-lg border border-slate-200 shadow-sm p-5 mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -44,7 +51,7 @@ export default async function ProjectDetailPage(props: { params: Promise<{ id: s
           <div className="text-3xl font-light text-slate-900 mt-1">{pct}%</div>
           <div className="text-xs text-slate-500 mt-1">{done}/{total} tasks done</div>
           <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden mt-2">
-            <div className="h-2 rounded-full" style={{ width: `${pct}%`, backgroundColor: tpl?.color ?? '#6366f1' }} />
+            <div className="h-2 rounded-full" style={{ width: pct + '%', backgroundColor: tpl?.color ?? '#6366f1' }} />
           </div>
         </div>
         <div>
@@ -65,7 +72,7 @@ export default async function ProjectDetailPage(props: { params: Promise<{ id: s
         </div>
       </section>
 
-      <TaskList projectId={p.id} tasks={taskRows} canEditMeta={true} canDelete={true} />
+      <TaskList projectId={p.id} tasks={taskRows} canEditMeta={true} canDelete={true} tools={tools} />
 
       <form action={deleteProject} className="mt-10 border-t border-red-100 pt-5">
         <input type="hidden" name="projectId" value={p.id} />
@@ -75,4 +82,4 @@ export default async function ProjectDetailPage(props: { params: Promise<{ id: s
       </form>
     </AppShell>
   )
-    }
+}
