@@ -357,3 +357,10 @@ export const MONTHLY_TEMPLATE_SLUGS = [
   'lead-generation',
   'social-selling',
 ];
+
+
+// Convenience array of monthly template objects (for UI iteration)
+export const MONTHLY_TEMPLATES: { slug: string; label: string; icon: string }[] = MONTHLY_TEMPLATE_SLUGS.map(slug => {
+  const t = TEMPLATES.find(t => t.slug === slug)
+  return { slug, label: t?.label ?? slug, icon: t?.icon ?? '📅' }
+})
