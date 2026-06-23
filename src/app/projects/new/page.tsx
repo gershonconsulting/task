@@ -13,7 +13,7 @@ export default async function NewProjectPage() {
       pageTitle="New Project"
       pageSubtitle="Pick a template and fill in client info — tasks auto-populate"
     >
-      <NewProjectForm userName={user.name} userEmail={user.email} />
+      <NewProjectForm />
     </AppShell>
   )
 }
