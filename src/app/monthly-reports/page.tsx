@@ -3,14 +3,10 @@ export const runtime = 'edge'
 import { getCurrentUser } from '@/lib/currentUser'
 import AppShell from '@/components/AppShell'
 import { supabaseAdmin } from '@/lib/supabaseServer'
+import { MONTHLY_TEMPLATES, MONTHLY_TEMPLATE_SLUGS } from '@/lib/templates'
 import Link from 'next/link'
 
 const MONTHS_BACK = 6
-
-const MONTHLY_TEMPLATES = [
-  { slug: 'monthly-report', label: 'Monthly Reports', icon: '📅' },
-  { slug: 'facturation',    label: 'Facturation',     icon: '💳' },
-]
 
 function monthLabel(year: number, month: number) {
   return new Date(year, month - 1, 1).toLocaleString('en-US', { month: 'short', year: 'numeric' })
@@ -37,20 +33,23 @@ export default async function MonthlyReportsPage() {
   const now    = new Date()
   const currentMonthKey = monthKey(now.getFullYear(), now.getMonth() + 1)
 
-  // Load all monthly projects for both templates
-  const { data: allProjects } = await supa
+  // Load all monthly projects for the tracked templates
+  const { data: monthlyProjects } = await supa
     .from('projects')
     .select('id, company_name, client_email, start_date, status, template_slug')
-    .in('template_slug', MONTHLY_TEMPLATES.map(t => t.slug))
+    .in('template_slug', MONTHLY_TEMPLATE_SLUGS)
     .order('start_date', { ascending: false })
 
-  const projects = allProjects ?? []
+  // Load ALL projects to find distinct clients (not just monthly ones)
+  const { data: allProjects } = await supa
+    .from('projects')
+    .select('client_email, company_name')
 
   // Task completion counts
   const { data: taskCounts } = await supa
     .from('tasks')
     .select('project_id, status')
-    .in('project_id', projects.map(r => r.id))
+    .in('project_id', (monthlyProjects ?? []).map(r => r.id))
 
   const tasksByProject = new Map<string, { total: number; done: number }>()
   for (const t of taskCounts ?? []) {
@@ -60,9 +59,9 @@ export default async function MonthlyReportsPage() {
     tasksByProject.set(t.project_id, cur)
   }
 
-  // Distinct clients (from all projects, sorted alphabetically by company)
+  // Distinct clients from ALL projects (so clients without monthly projects still show)
   const clientMap = new Map<string, string>()
-  for (const p of projects) {
+  for (const p of allProjects ?? []) {
     if (p.client_email && !clientMap.has(p.client_email)) {
       clientMap.set(p.client_email, p.company_name ?? p.client_email)
     }
@@ -70,10 +69,10 @@ export default async function MonthlyReportsPage() {
   const clients = Array.from(clientMap.entries()).sort((a, b) => a[1].localeCompare(b[1]))
 
   // Build index per template: "email|monthKey" → project
-  const idxByTemplate = new Map<string, Map<string, typeof projects[0]>>()
+  const idxByTemplate = new Map<string, Map<string, typeof (monthlyProjects ?? [])[0]>>()
   for (const tmpl of MONTHLY_TEMPLATES) {
-    const idx = new Map<string, typeof projects[0]>()
-    for (const p of projects.filter(r => r.template_slug === tmpl.slug)) {
+    const idx = new Map<string, typeof (monthlyProjects ?? [])[0]>()
+    for (const p of (monthlyProjects ?? []).filter(r => r.template_slug === tmpl.slug)) {
       if (!p.client_email || !p.start_date) continue
       idx.set(p.client_email + '|' + p.start_date.slice(0, 7), p)
     }
@@ -84,7 +83,6 @@ export default async function MonthlyReportsPage() {
     <AppShell userName={user.name} userRole={user.role}
       pageTitle="Monthly Projects" pageSubtitle="Auto-created on the 1st of every month for all clients">
 
-      {/* Generate button */}
       <div className="flex items-center justify-between mb-8">
         <p className="text-sm text-slate-500">
           Showing last {MONTHS_BACK} months · {clients.length} client{clients.length !== 1 ? 's' : ''}
@@ -147,7 +145,7 @@ export default async function MonthlyReportsPage() {
 
                             return (
                               <td key={m.key} className="px-3 py-3 text-center">
-                                <Link href={"/projects/" + proj.id}
+                                <Link href={'/projects/' + proj.id}
                                   className={`inline-flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-lg border ${statusColor} hover:opacity-80 transition min-w-[60px]`}>
                                   <span className="font-semibold text-xs">{pct}%</span>
                                   <span className="text-[10px] opacity-70">{counts?.done}/{counts?.total}</span>
@@ -166,7 +164,6 @@ export default async function MonthlyReportsPage() {
         </div>
       )}
 
-      {/* Legend */}
       <div className="flex items-center gap-4 mt-6 text-xs text-slate-400">
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-green-100 border border-green-200 inline-block" /> 100% done</span>
         <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-100 border border-amber-200 inline-block" /> In progress</span>
@@ -175,4 +172,4 @@ export default async function MonthlyReportsPage() {
       </div>
     </AppShell>
   )
-                  }
+  }
