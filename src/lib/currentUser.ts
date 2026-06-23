@@ -17,7 +17,7 @@ export async function getCurrentUser(): Promise<CurrentUser> {
       return {
         name: session.user.name,
         email: session.user.email,
-        role: (session.user.role as CurrentUser['role']) ?? 'admin',
+        role: 'admin', // SessionData.user doesn't expose role — default to admin
       }
     }
   } catch {
