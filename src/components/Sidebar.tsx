@@ -10,14 +10,15 @@ interface SidebarProps {
 }
 
 const NAV = [
-  { href: '/dashboard',  label: 'Dashboard',   icon: '📊' },
-  { href: '/projects',   label: 'By Project',   icon: '📁' },
-  { href: '/clients',    label: 'By Client',    icon: '🏢' },
-  { href: '/tasks',      label: 'Tasks',        icon: '✅' },
-  { href: '/tools',      label: 'By Tool',      icon: '🔧' },
-  { href: '/users',      label: 'By Provider',  icon: '👥' },
-  { href: '/stages',     label: 'By Stage',     icon: '📋' },
-  { href: '/reports',    label: 'Reports',      icon: '📄' },
+  { href: '/dashboard',        label: 'Dashboard',        icon: '📊' },
+  { href: '/projects',         label: 'By Project',       icon: '📁' },
+  { href: '/clients',          label: 'By Client',        icon: '🏢' },
+  { href: '/tasks',            label: 'Tasks',            icon: '✅' },
+  { href: '/monthly-reports',  label: 'Monthly Reports',  icon: '📅' },
+  { href: '/tools',            label: 'By Tool',          icon: '🔧' },
+  { href: '/users',            label: 'By Provider',      icon: '👥' },
+  { href: '/stages',           label: 'By Stage',         icon: '📋' },
+  { href: '/reports',          label: 'Reports',          icon: '📄' },
 ]
 
 export default function Sidebar({ userName, userRole }: SidebarProps) {
