@@ -4,6 +4,12 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseServer'
 import { createProjectFromTemplate } from '@/lib/projectCreate'
 
+// Monthly templates to auto-create for every client each month
+const MONTHLY_TEMPLATES = [
+  { slug: 'monthly-report', label: 'Monthly Report' },
+  { slug: 'facturation',    label: 'Facturation' },
+]
+
 // POST /api/cron/monthly-reports
 // Called by Cloudflare cron on the 1st of each month OR manually from the Monthly Reports page
 export async function POST(req: Request) {
@@ -22,6 +28,7 @@ export async function POST(req: Request) {
 
   if (projErr) return NextResponse.json({ error: projErr.message }, { status: 500 })
 
+  // Build unique client map
   const clientMap = new Map<string, {
     email: string; companyName: string; firstName?: string; lastName?: string;
     domain?: string; createdBy: string;
@@ -44,40 +51,39 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: 'No clients found', created: 0 })
   }
 
+  // Check which (template_slug, client_email, start_date) combos already exist
   const { data: existing } = await supa
     .from('projects')
-    .select('client_email')
-    .eq('template_slug', 'monthly-report')
+    .select('client_email, template_slug')
+    .in('template_slug', MONTHLY_TEMPLATES.map(t => t.slug))
     .eq('start_date', startDate)
 
-  const alreadyHas = new Set((existing ?? []).map(p => p.client_email))
+  const alreadyHas = new Set((existing ?? []).map(p => p.template_slug + '|' + p.client_email))
 
-  const created: string[] = []
-  const skipped: string[] = []
-  const errors:  string[] = []
+  const summary: Record<string, { created: string[]; skipped: string[]; errors: string[] }> = {}
+  for (const t of MONTHLY_TEMPLATES) summary[t.slug] = { created: [], skipped: [], errors: [] }
 
   for (const [email, client] of clientMap) {
-    if (alreadyHas.has(email)) { skipped.push(email); continue }
-    try {
-      await createProjectFromTemplate({
-        templateSlug:    'monthly-report',
-        companyName:     client.companyName,
-        clientFirstName: client.firstName,
-        clientLastName:  client.lastName,
-        clientEmail:     email,
-        clientDomain:    client.domain,
-        startDate,
-        createdByEmail:  client.createdBy,
-      })
-      created.push(email)
-    } catch (e) {
-      errors.push(email + ': ' + (e instanceof Error ? e.message : String(e)))
+    for (const tmpl of MONTHLY_TEMPLATES) {
+      const key = tmpl.slug + '|' + email
+      if (alreadyHas.has(key)) { summary[tmpl.slug].skipped.push(email); continue }
+      try {
+        await createProjectFromTemplate({
+          templateSlug:    tmpl.slug,
+          companyName:     client.companyName,
+          clientFirstName: client.firstName,
+          clientLastName:  client.lastName,
+          clientEmail:     email,
+          clientDomain:    client.domain,
+          startDate,
+          createdByEmail:  client.createdBy,
+        })
+        summary[tmpl.slug].created.push(email)
+      } catch (e) {
+        summary[tmpl.slug].errors.push(email + ': ' + (e instanceof Error ? e.message : String(e)))
+      }
     }
   }
 
-  return NextResponse.json({
-    month: label, clients: clientMap.size,
-    created: created.length, skipped: skipped.length,
-    errors, createdFor: created,
-  })
+  return NextResponse.json({ month: label, clients: clientMap.size, summary })
 }
