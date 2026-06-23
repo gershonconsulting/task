@@ -13,7 +13,7 @@ export interface NewProjectInput {
   clientEmail: string;
   clientLinkedinUrl?: string;
   clientDomain?: string;
-  startDate?: string;   // YYYY-MM-DD, defaults to today
+  startDate?: string; // YYYY-MM-DD, defaults to today
   endDate?: string;
   createdByEmail: string;
 }
@@ -25,7 +25,7 @@ export interface NewProjectResult {
 
 export async function createProjectFromTemplate(input: NewProjectInput): Promise<NewProjectResult> {
   const tpl = getTemplate(input.templateSlug);
-  if (!tpl) throw new Error(`Unknown template: ${input.templateSlug}`);
+  if (!tpl) throw new Error('Unknown template: ' + input.templateSlug);
 
   const start = input.startDate ?? new Date().toISOString().slice(0, 10);
   const supa = supabaseAdmin();
@@ -51,10 +51,10 @@ export async function createProjectFromTemplate(input: NewProjectInput): Promise
     .single();
 
   if (projErr || !proj) {
-    throw new Error(`Project insert failed: ${projErr?.message ?? 'unknown'}`);
+    throw new Error('Project insert failed: ' + (projErr?.message ?? 'unknown'));
   }
 
-  // 2. Build task rows from the template
+  // 2. Build task rows from the template (include tool field)
   const startMs = new Date(start).getTime();
   const dayMs = 86_400_000;
 
@@ -74,6 +74,7 @@ export async function createProjectFromTemplate(input: NewProjectInput): Promise
       due_date: due,
       notes: null,
       template_item_id: t.id,
+      tool: t.tool ?? null,
     };
   });
 
@@ -81,7 +82,7 @@ export async function createProjectFromTemplate(input: NewProjectInput): Promise
   if (taskErr) {
     // Roll back project row to avoid orphaned project with no tasks
     await supa.from('projects').delete().eq('id', proj.id);
-    throw new Error(`Task batch insert failed (project rolled back): ${taskErr.message}`);
+    throw new Error('Task batch insert failed (project rolled back): ' + taskErr.message);
   }
 
   return { projectId: proj.id, taskCount: taskRows.length };
