@@ -3,12 +3,7 @@ export const runtime = 'edge'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseServer'
 import { createProjectFromTemplate } from '@/lib/projectCreate'
-
-// Monthly templates to auto-create for every client each month
-const MONTHLY_TEMPLATES = [
-  { slug: 'monthly-report', label: 'Monthly Report' },
-  { slug: 'facturation',    label: 'Facturation' },
-]
+import { MONTHLY_TEMPLATE_SLUGS, TEMPLATES } from '@/lib/templates'
 
 // POST /api/cron/monthly-reports
 // Called by Cloudflare cron on the 1st of each month OR manually from the Monthly Reports page
@@ -21,6 +16,12 @@ export async function POST(req: Request) {
   const month = parseInt(url.searchParams.get('month') ?? String(now.getUTCMonth() + 1))
   const label     = year + '-' + String(month).padStart(2, '0')
   const startDate = year + '-' + String(month).padStart(2, '0') + '-01'
+
+  // Build monthly template descriptors from the canonical list
+  const monthlyTemplates = MONTHLY_TEMPLATE_SLUGS.map(slug => ({
+    slug,
+    label: TEMPLATES.find(t => t.slug === slug)?.label ?? slug,
+  }))
 
   const { data: projects, error: projErr } = await supa
     .from('projects')
@@ -51,20 +52,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: 'No clients found', created: 0 })
   }
 
-  // Check which (template_slug, client_email, start_date) combos already exist
+  // Check which combos already exist for this month
   const { data: existing } = await supa
     .from('projects')
     .select('client_email, template_slug')
-    .in('template_slug', MONTHLY_TEMPLATES.map(t => t.slug))
+    .in('template_slug', MONTHLY_TEMPLATE_SLUGS)
     .eq('start_date', startDate)
 
   const alreadyHas = new Set((existing ?? []).map(p => p.template_slug + '|' + p.client_email))
 
   const summary: Record<string, { created: string[]; skipped: string[]; errors: string[] }> = {}
-  for (const t of MONTHLY_TEMPLATES) summary[t.slug] = { created: [], skipped: [], errors: [] }
+  for (const t of monthlyTemplates) summary[t.slug] = { created: [], skipped: [], errors: [] }
 
   for (const [email, client] of clientMap) {
-    for (const tmpl of MONTHLY_TEMPLATES) {
+    for (const tmpl of monthlyTemplates) {
       const key = tmpl.slug + '|' + email
       if (alreadyHas.has(key)) { summary[tmpl.slug].skipped.push(email); continue }
       try {
