@@ -4,3 +4,7 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 NEXT_PUBLIC_SITE_URL = "https://task.gershoncrm.com"
+
+# Run on the 1st of every month at 06:00 UTC
+[triggers]
+crons = ["0 6 1 * *"]
