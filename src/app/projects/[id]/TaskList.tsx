@@ -4,30 +4,31 @@ import { useState } from 'react';
 import type { TaskRow } from '@/lib/supabaseServer';
 import {
   updateTaskStatus, updateTaskNotes, updateTaskAssignee,
-  updateTaskPriority, updateTaskDueDate, deleteTask,
+  updateTaskPriority, updateTaskDueDate, updateTaskTool, deleteTask,
 } from './actions';
 
 interface Props {
   projectId: string;
   tasks: TaskRow[];
-  canEditMeta: boolean;  // team/admin: assignee, priority, due
-  canDelete: boolean;    // team/admin
+  canEditMeta: boolean;
+  canDelete: boolean;
+  tools?: { slug: string; label: string; icon: string; color: string }[];
 }
 
 const TEAM = ['Olivier', 'Winnie Lauren', 'Aina Rama', 'Sai', 'Denice', 'Prash', 'Joseph', 'Lauren'];
 
 const STATUS_STYLES: Record<TaskRow['status'], string> = {
-  pending:     'bg-amber-50 border-amber-200',
-  in_progress: 'bg-blue-50  border-blue-200',
-  completed:   'bg-emerald-50 border-emerald-200',
+  pending: 'bg-amber-50 border-amber-200',
+  in_progress: 'bg-blue-50 border-blue-200',
+  completed: 'bg-emerald-50 border-emerald-200',
 };
 const PRIORITY_DOT: Record<TaskRow['priority'], string> = {
-  low:    'bg-slate-400',
+  low: 'bg-slate-400',
   medium: 'bg-amber-500',
-  high:   'bg-red-500',
+  high: 'bg-red-500',
 };
 
-export default function TaskList({ projectId, tasks, canEditMeta, canDelete }: Props) {
+export default function TaskList({ projectId, tasks, canEditMeta, canDelete, tools = [] }: Props) {
   if (tasks.length === 0) {
     return <p className="text-sm text-slate-500 italic">No tasks in this project.</p>;
   }
@@ -38,12 +39,13 @@ export default function TaskList({ projectId, tasks, canEditMeta, canDelete }: P
       </h2>
       <ul className="space-y-2">
         {tasks.map((t) => (
-          <TaskRow
+          <TaskItem
             key={t.id}
             t={t}
             projectId={projectId}
             canEditMeta={canEditMeta}
             canDelete={canDelete}
+            tools={tools}
           />
         ))}
       </ul>
@@ -51,17 +53,19 @@ export default function TaskList({ projectId, tasks, canEditMeta, canDelete }: P
   );
 }
 
-function TaskRow({
-  t, projectId, canEditMeta, canDelete,
-}: { t: TaskRow; projectId: string; canEditMeta: boolean; canDelete: boolean }) {
+function TaskItem({
+  t, projectId, canEditMeta, canDelete, tools,
+}: { t: TaskRow; projectId: string; canEditMeta: boolean; canDelete: boolean; tools: { slug: string; label: string; icon: string; color: string }[] }) {
   const [expanded, setExpanded] = useState(false);
+  const toolMap = Object.fromEntries(tools.map(t => [t.slug, t]));
+  const taskTool = (t as any).tool ? toolMap[(t as any).tool] : null;
 
   return (
-    <li className={`rounded-lg border-2 ${STATUS_STYLES[t.status]} p-3`}>
+    <li className={'rounded-lg border-2 ' + STATUS_STYLES[t.status] + ' p-3'}>
       <div className="flex items-start gap-3">
         {/* Status dropdown */}
         <form action={updateTaskStatus} className="flex-shrink-0">
-          <input type="hidden" name="taskId"   value={t.id} />
+          <input type="hidden" name="taskId" value={t.id} />
           <input type="hidden" name="projectId" value={projectId} />
           <select
             name="status"
@@ -77,8 +81,16 @@ function TaskRow({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`inline-block w-2 h-2 rounded-full ${PRIORITY_DOT[t.priority]}`} />
+            <span className={'inline-block w-2 h-2 rounded-full ' + PRIORITY_DOT[t.priority]} />
             <span className="font-medium text-slate-900 text-sm">{t.name}</span>
+            {taskTool && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white"
+                style={{ backgroundColor: taskTool.color }}
+              >
+                {taskTool.icon} {taskTool.label}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3 mt-1 text-xs text-slate-600 flex-wrap">
             <span>👤 {t.assigned_to ?? <em className="italic text-slate-400">unassigned</em>}</span>
@@ -105,7 +117,7 @@ function TaskRow({
           {canEditMeta && (
             <>
               <form action={updateTaskAssignee}>
-                <input type="hidden" name="taskId"    value={t.id} />
+                <input type="hidden" name="taskId" value={t.id} />
                 <input type="hidden" name="projectId" value={projectId} />
                 <label className="block">
                   <span className="block text-slate-500 mb-0.5">Assigned to</span>
@@ -122,7 +134,7 @@ function TaskRow({
               </form>
 
               <form action={updateTaskPriority}>
-                <input type="hidden" name="taskId"    value={t.id} />
+                <input type="hidden" name="taskId" value={t.id} />
                 <input type="hidden" name="projectId" value={projectId} />
                 <label className="block">
                   <span className="block text-slate-500 mb-0.5">Priority</span>
@@ -140,7 +152,7 @@ function TaskRow({
               </form>
 
               <form action={updateTaskDueDate}>
-                <input type="hidden" name="taskId"    value={t.id} />
+                <input type="hidden" name="taskId" value={t.id} />
                 <input type="hidden" name="projectId" value={projectId} />
                 <label className="block">
                   <span className="block text-slate-500 mb-0.5">Due date</span>
@@ -153,11 +165,32 @@ function TaskRow({
                   />
                 </label>
               </form>
+
+              {tools.length > 0 && (
+                <form action={updateTaskTool}>
+                  <input type="hidden" name="taskId" value={t.id} />
+                  <input type="hidden" name="projectId" value={projectId} />
+                  <label className="block">
+                    <span className="block text-slate-500 mb-0.5">Tool</span>
+                    <select
+                      name="tool"
+                      defaultValue={(t as any).tool ?? ''}
+                      onChange={(e) => e.currentTarget.form?.requestSubmit()}
+                      className="w-full text-xs rounded border border-slate-300 px-1.5 py-1 bg-white"
+                    >
+                      <option value="">— no tool —</option>
+                      {tools.map(tl => (
+                        <option key={tl.slug} value={tl.slug}>{tl.icon} {tl.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                </form>
+              )}
             </>
           )}
 
           <form action={updateTaskNotes} className={canEditMeta ? 'sm:col-span-2' : ''}>
-            <input type="hidden" name="taskId"    value={t.id} />
+            <input type="hidden" name="taskId" value={t.id} />
             <input type="hidden" name="projectId" value={projectId} />
             <label className="block">
               <span className="block text-slate-500 mb-0.5">Notes</span>
@@ -176,7 +209,7 @@ function TaskRow({
 
           {canDelete && (
             <form action={deleteTask} className="sm:col-span-2 text-right">
-              <input type="hidden" name="taskId"    value={t.id} />
+              <input type="hidden" name="taskId" value={t.id} />
               <input type="hidden" name="projectId" value={projectId} />
               <button
                 type="submit"
