@@ -4,36 +4,31 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TEMPLATES, type ProcessTemplate } from '@/lib/templates';
 
-const GROUPS: { label: string; hint: string; slugs: string[] }[] = [
-  {
-    label: 'Setup & Lifecycle',
-    hint: 'Run once per client engagement.',
-    slugs: ['client-onboarding', 'end-of-project'],
-  },
-  {
-    label: 'Monthly Deliverables',
-    hint: 'Recurring service delivery — instantiate a new project each cycle.',
-    slugs: ['monthly-report', 'social-content-creation', 'social-selling', 'lead-generation', 'market-research'],
-  },
-  {
-    label: 'Billing',
-    hint: 'Finance side of the engagement.',
-    slugs: ['facturation'],
-  },
-  {
-    label: 'People & Partners',
-    hint: 'Internal team & external partner onboarding.',
-    slugs: ['staff-onboarding', 'onboarding-partner'],
-  },
-];
+// Category display metadata
+const CATEGORY_META: Record<string, { hint: string }> = {
+  'Setup & Lifecycle':  { hint: 'Run once per client engagement.' },
+  'Monthly Recurring':  { hint: 'Auto-created every month — or create one manually.' },
+  'Onboarding':         { hint: 'One-time service setup for a client.' },
+  'Billing':            { hint: 'Finance side of the engagement.' },
+  'People & Partners':  { hint: 'Internal team & external partner onboarding.' },
+};
+// Preferred display order
+const CATEGORY_ORDER = ['Setup & Lifecycle', 'Monthly Recurring', 'Onboarding', 'Billing', 'People & Partners'];
 
 function groupedTemplates(): { label: string; hint: string; items: ProcessTemplate[] }[] {
-  const bySlug = new Map(TEMPLATES.map(t => [t.slug, t]));
-  return GROUPS.map(g => ({
-    label: g.label,
-    hint: g.hint,
-    items: g.slugs.map(s => bySlug.get(s)).filter(Boolean) as ProcessTemplate[],
-  })).filter(g => g.items.length > 0);
+  const grouped: Record<string, ProcessTemplate[]> = {};
+  for (const t of TEMPLATES) {
+    const cat = t.category ?? 'Other';
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(t);
+  }
+  return CATEGORY_ORDER
+    .filter(cat => grouped[cat]?.length)
+    .map(cat => ({
+      label: cat,
+      hint: CATEGORY_META[cat]?.hint ?? '',
+      items: grouped[cat],
+    }));
 }
 
 export default function NewProjectForm() {
@@ -43,7 +38,7 @@ export default function NewProjectForm() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const groups = groupedTemplates();
+  const groups  = groupedTemplates();
   const selected = TEMPLATES.find(t => t.slug === templateSlug);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -111,13 +106,13 @@ export default function NewProjectForm() {
         </div>
       </fieldset>
 
-      {/* Step 2 — minimal client info */}
+      {/* Step 2 — client info */}
       <fieldset className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm">
         <legend className="px-2 text-xs uppercase tracking-wider font-bold text-indigo-700">
           2. Name & email
         </legend>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-          <Field name="companyName" label="Project name *" placeholder={selected?.label === 'Client Onboarding' ? 'e.g. TechFlow Inc.' : 'e.g. TechFlow — May 2026'} required />
+          <Field name="companyName" label="Project name *" placeholder={selected?.label === 'Client Onboarding' ? 'e.g. TechFlow Inc.' : 'e.g. TechFlow — Jun 2026'} required />
           <Field name="clientEmail" label="Client email *" type="email" required />
         </div>
 
@@ -132,13 +127,13 @@ export default function NewProjectForm() {
         {showMore && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-200">
             <Field name="clientFirstName" label="First name" />
-            <Field name="clientLastName" label="Last name" />
-            <Field name="clientTitle" label="Title" />
+            <Field name="clientLastName"  label="Last name" />
+            <Field name="clientTitle"     label="Title" />
             <Field name="clientLinkedinUrl" label="LinkedIn URL" placeholder="linkedin.com/in/…" />
-            <Field name="clientDomain" label="Domain" placeholder="example.com" />
+            <Field name="clientDomain"    label="Domain" placeholder="example.com" />
             <div />
             <Field name="startDate" label="Start date (defaults to today)" type="date" />
-            <Field name="endDate" label="End date" type="date" />
+            <Field name="endDate"   label="End date" type="date" />
           </div>
         )}
       </fieldset>
@@ -178,4 +173,4 @@ function Field({
       />
     </label>
   );
-              }
+    }
