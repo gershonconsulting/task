@@ -1,21 +1,17 @@
-import { getIronSession } from 'iron-session'
-import { cookies } from 'next/headers'
-import Link from 'next/link'
-import { getSessionOptions, type SessionData } from '@/lib/session'
-import { type ProjectProgressRow } from '@/lib/supabaseServer'
-import { getTemplate } from '@/lib/templates'
-import AppHeader from '@/components/AppHeader'
-
 export const runtime = 'edge'
 
+import Link from 'next/link'
+import { getCurrentUser } from '@/lib/currentUser'
+import { supabaseAdmin, type ProjectProgressRow } from '@/lib/supabaseServer'
+import { getTemplate } from '@/lib/templates'
+import AppShell from '@/components/AppShell'
+
 export default async function ProjectsPage() {
-  const session = await getIronSession<SessionData>(await cookies(), getSessionOptions())
-  const userName = session.user?.name ?? 'Guest'
+  const user = await getCurrentUser()
 
   let rows: ProjectProgressRow[] | null = null
   let dbError: string | null = null
   try {
-    const { supabaseAdmin } = await import('@/lib/supabaseServer')
     const { data, error } = await supabaseAdmin()
       .from('project_progress')
       .select('*')
@@ -27,36 +23,38 @@ export default async function ProjectsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <AppHeader
-          title="Projects"
-          subtitle="All client engagements"
-          actions={[{ href: '/projects/new', label: '+ New Project', tone: 'primary' }]}
-          user={{ name: userName, role: 'admin' }}
-        />
-        {dbError && (
-          <div className="p-4 rounded-md bg-red-50 border border-red-200 text-red-800 text-sm mb-6">
-            <strong>Database error:</strong> {dbError}
-          </div>
-        )}
-        {!dbError && rows && rows.length === 0 && (
-          <div className="text-center py-16 bg-white rounded-lg border border-dashed border-slate-300">
-            <p className="text-slate-500 mb-4">No projects yet.</p>
-            <Link href="/projects/new" className="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold">
-              Create the first one
-            </Link>
-          </div>
-        )}
-        {!dbError && rows && rows.length > 0 && (
-          <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {rows.map((r) => (
-              <ProjectCard key={r.project_id} row={r} />
-            ))}
-          </ul>
-        )}
+    <AppShell
+      userName={user.name}
+      userRole={user.role}
+      pageTitle="Projects"
+      pageSubtitle="All client engagements"
+    >
+      <div className="mb-6">
+        <Link href="/projects/new" className="inline-block px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold">
+          + New Project
+        </Link>
       </div>
-    </div>
+      {dbError && (
+        <div className="p-4 rounded-md bg-red-50 border border-red-200 text-red-800 text-sm mb-6">
+          <strong>Database error:</strong> {dbError}
+        </div>
+      )}
+      {!dbError && rows && rows.length === 0 && (
+        <div className="text-center py-16 bg-white rounded-lg border border-dashed border-slate-300">
+          <p className="text-slate-500 mb-4">No projects yet.</p>
+          <Link href="/projects/new" className="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold">
+            Create the first one
+          </Link>
+        </div>
+      )}
+      {!dbError && rows && rows.length > 0 && (
+        <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {rows.map((r) => (
+            <ProjectCard key={r.project_id} row={r} />
+          ))}
+        </ul>
+      )}
+    </AppShell>
   )
 }
 
@@ -85,4 +83,4 @@ function ProjectCard({ row }: { row: ProjectProgressRow }) {
       </Link>
     </li>
   )
-                }
+}
