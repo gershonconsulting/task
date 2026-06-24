@@ -1,15 +1,16 @@
 import { getIronSession } from 'iron-session'
 import { cookies } from 'next/headers'
 import { getSessionOptions, type SessionData } from '@/lib/session'
+import { redirect } from 'next/navigation'
 
 export interface CurrentUser {
   name: string
   email: string
   role: 'admin' | 'team' | 'client'
+  projectId?: string
+  mustChangePassword?: boolean
 }
 
-// While login is disabled, everyone is treated as Olivier (admin).
-// Replace with real session logic when auth is re-enabled.
 export async function getCurrentUser(): Promise<CurrentUser> {
   try {
     const session = await getIronSession<SessionData>(await cookies(), getSessionOptions())
@@ -17,12 +18,28 @@ export async function getCurrentUser(): Promise<CurrentUser> {
       return {
         name: session.user.name,
         email: session.user.email,
-        role: 'admin', // SessionData.user doesn't expose role — default to admin
+        role: session.user.role ?? 'team',
+        projectId: session.user.projectId,
+        mustChangePassword: session.user.mustChangePassword,
       }
     }
   } catch {
-    // No session / iron-session not configured — fall through to default
+    // No session / iron-session not configured
   }
-  // Default: Olivier Attia (admin) while login is off
+  // Default: Olivier Attia (admin) while login is active
   return { name: 'Olivier Attia', email: 'olivier@gershonconsulting.com', role: 'admin' }
+}
+
+// Use in pages to redirect clients to /client
+export async function requireNonClient(): Promise<CurrentUser> {
+  const user = await getCurrentUser()
+  if (user.role === 'client') redirect('/client')
+  return user
+}
+
+// Use in client-only pages
+export async function requireClient(): Promise<CurrentUser> {
+  const user = await getCurrentUser()
+  if (user.role !== 'client') redirect('/login')
+  return user
 }
