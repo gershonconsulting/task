@@ -1,3 +1,4 @@
 import { redirect } from 'next/navigation'
 export const runtime = 'edge'
-export default function RootPage() { redirect('/dashboard') }
+// Root page: redirect to login — user selects their identity there
+export default function RootPage() { redirect('/login') }
