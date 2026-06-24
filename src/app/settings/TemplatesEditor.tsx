@@ -30,7 +30,6 @@ interface ProcessTemplate {
   tasks: TemplateTask[]
 }
 
-const PEOPLE = ['Olivier', 'Winnie Lauren', 'Aina Rama', 'Sai', null]
 const PRIORITIES: Priority[] = ['low', 'medium', 'high']
 
 function priorityColor(p: Priority | undefined) {
@@ -38,8 +37,6 @@ function priorityColor(p: Priority | undefined) {
   if (p === 'low') return 'text-slate-400 bg-slate-50'
   return 'text-amber-600 bg-amber-50'
 }
-
-// ─── Tools Editor ───────────────────────────────────────────────────────────
 
 interface ToolsEditorProps {
   tools: Tool[]
@@ -107,12 +104,11 @@ function ToolsEditor({ tools, onChange }: ToolsEditorProps) {
   )
 }
 
-// ─── Templates Editor ────────────────────────────────────────────────────────
-
 export default function TemplatesEditor() {
   const [templates, setTemplates] = useState<ProcessTemplate[]>([])
   const [tools, setTools] = useState<Tool[]>([])
   const [overrides, setOverrides] = useState<Record<string, { tasks?: TemplateTask[] }>>({})
+  const [people, setPeople] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -120,18 +116,20 @@ export default function TemplatesEditor() {
   const [openSlug, setOpenSlug] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/settings/templates')
-      .then(r => r.json())
-      .then(data => {
-        setTemplates(data.templates)
-        setOverrides(data.overrides ?? {})
-        setTools(data.tools ?? [])
-        setLoading(false)
-      })
-      .catch(() => {
-        setError('Failed to load templates')
-        setLoading(false)
-      })
+    Promise.all([
+      fetch('/api/settings/templates').then(r => r.json()),
+      fetch('/api/settings/team').then(r => r.json()),
+    ]).then(([tplData, teamData]) => {
+      setTemplates(tplData.templates)
+      setOverrides(tplData.overrides ?? {})
+      setTools(tplData.tools ?? [])
+      const names = (teamData.members ?? []).map((m: { name: string }) => m.name).filter(Boolean)
+      setPeople(names)
+      setLoading(false)
+    }).catch(() => {
+      setError('Failed to load settings')
+      setLoading(false)
+    })
   }, [])
 
   function getEffectiveTasks(slug: string, baseTasks: TemplateTask[]): TemplateTask[] {
@@ -212,7 +210,6 @@ export default function TemplatesEditor() {
         <div className="p-3 rounded-md bg-red-50 border border-red-200 text-red-800 text-sm">{error}</div>
       )}
 
-      {/* ── Tools section ── */}
       <div>
         <h2 className="text-base font-semibold text-slate-900 mb-1">Tools</h2>
         <p className="text-sm text-slate-500 mb-3">
@@ -223,7 +220,6 @@ export default function TemplatesEditor() {
 
       <hr className="border-slate-200" />
 
-      {/* ── Templates section ── */}
       <div>
         <h2 className="text-base font-semibold text-slate-900 mb-1">Project Templates</h2>
         <p className="text-sm text-slate-500 mb-4">
@@ -281,12 +277,11 @@ export default function TemplatesEditor() {
                               className="px-2 py-1.5 rounded border border-slate-200 text-sm focus:outline-none focus:border-indigo-400 bg-white"
                             >
                               <option value="">Unassigned</option>
-                              {PEOPLE.filter(Boolean).map(p => (
-                                <option key={p!} value={p!}>{p}</option>
+                              {people.map(p => (
+                                <option key={p} value={p}>{p}</option>
                               ))}
                             </select>
 
-                            {/* Tool picker */}
                             <select
                               value={task.tool ?? ''}
                               onChange={e => updateTask(tpl.slug, idx, { tool: e.target.value || undefined })}
