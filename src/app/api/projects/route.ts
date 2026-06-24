@@ -6,6 +6,7 @@ import { cookies } from 'next/headers'
 import { getSessionOptions, SessionData } from '@/lib/session'
 import { createProjectFromTemplate } from '@/lib/projectCreate'
 import { getTemplate } from '@/lib/templates'
+import type { ProjectType } from '@/lib/templates'
 import { supabaseAdmin } from '@/lib/supabaseServer'
 import { hashPassword } from '@/lib/password'
 
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest) {
   const companyName = (body.companyName ?? '').trim()
   const clientEmail = (body.clientEmail ?? '').trim().toLowerCase()
   const existingClientId = (body.existingClientId ?? '').trim()
+  const projectType = ((body.projectType ?? 'advanced').trim()) as ProjectType
 
   if (!templateSlug || !getTemplate(templateSlug)) {
     return NextResponse.json({ error: 'Pick a valid template.' }, { status: 400 })
@@ -67,6 +69,7 @@ export async function POST(req: NextRequest) {
       startDate: (body.startDate ?? '').trim() || undefined,
       endDate: (body.endDate ?? '').trim() || undefined,
       createdByEmail,
+      projectType,
     })
 
     const projectId = result.projectId
