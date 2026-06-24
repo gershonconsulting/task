@@ -68,7 +68,7 @@ function ToolIcon({ tool, size = 20 }: ToolIconProps) {
       />
     )
   }
-  return <span style={{ fontSize: size - 4 }}>{tool.icon || '\ud83d\udd27'}</span>
+  return <span style={{ fontSize: size - 4 }}>{tool.icon || '🔧'}</span>
 }
 
 interface ToolsEditorProps {
@@ -86,7 +86,7 @@ function ToolsEditor({ tools, onChange }: ToolsEditorProps) {
     onChange(tools.filter((_, i) => i !== idx))
   }
   function addTool() {
-    onChange([...tools, { slug: 'new-tool-' + Date.now(), label: 'New Tool', icon: '\ud83d\udd27', color: '#6366f1', url: '' }])
+    onChange([...tools, { slug: 'new-tool-' + Date.now(), label: 'New Tool', icon: '🔧', color: '#6366f1', url: '' }])
   }
 
   return (
@@ -130,7 +130,7 @@ function ToolsEditor({ tools, onChange }: ToolsEditorProps) {
             onClick={() => removeTool(idx)}
             className="text-red-400 hover:text-red-600 text-xs font-bold px-1"
             title="Remove tool"
-          >\u2715</button>
+          >✕</button>
         </div>
       ))}
       <button
@@ -286,7 +286,7 @@ export default function TemplatesEditor() {
                       <div className="text-xs text-slate-400">{tasks.length} tasks</div>
                     </div>
                   </div>
-                  <span className="text-slate-400 text-xs">{isOpen ? '\u25b2' : '\u25bc'}</span>
+                  <span className="text-slate-400 text-xs">{isOpen ? '▲' : '▼'}</span>
                 </button>
 
                 {isOpen && (
@@ -297,9 +297,9 @@ export default function TemplatesEditor() {
                         <div key={task.id} className="flex items-start gap-2 p-3 bg-slate-50 rounded-md">
                           <div className="flex flex-col gap-0.5 pt-1">
                             <button type="button" onClick={() => moveTask(tpl.slug, idx, -1)} disabled={idx === 0}
-                              className="text-slate-300 hover:text-slate-600 disabled:opacity-20 text-xs leading-none" title="Move up">\u25b2</button>
+                              className="text-slate-300 hover:text-slate-600 disabled:opacity-20 text-xs leading-none" title="Move up">▲</button>
                             <button type="button" onClick={() => moveTask(tpl.slug, idx, 1)} disabled={idx === tasks.length - 1}
-                              className="text-slate-300 hover:text-slate-600 disabled:opacity-20 text-xs leading-none" title="Move down">\u25bc</button>
+                              className="text-slate-300 hover:text-slate-600 disabled:opacity-20 text-xs leading-none" title="Move down">▼</button>
                           </div>
 
                           <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-2">
@@ -357,7 +357,7 @@ export default function TemplatesEditor() {
                                 </span>
                               )}
                               <button type="button" onClick={() => removeTask(tpl.slug, idx)}
-                                className="ml-auto text-red-400 hover:text-red-600 text-xs font-bold px-1" title="Remove task">\u2715</button>
+                                className="ml-auto text-red-400 hover:text-red-600 text-xs font-bold px-1" title="Remove task">✕</button>
                             </div>
                           </div>
                         </div>
@@ -369,7 +369,7 @@ export default function TemplatesEditor() {
                         className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">+ Add task</button>
                       {isModified && (
                         <button type="button" onClick={() => resetTemplate(tpl.slug)}
-                          className="text-xs text-slate-400 hover:text-slate-600">\u21ba Reset to default</button>
+                          className="text-xs text-slate-400 hover:text-slate-600">↺ Reset to default</button>
                       )}
                     </div>
                   </div>
@@ -387,9 +387,9 @@ export default function TemplatesEditor() {
           disabled={saving}
           className="px-5 py-2.5 rounded-md bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white text-sm font-semibold"
         >
-          {saving ? 'Saving\u2026' : 'Save changes'}
+          {saving ? 'Saving…' : 'Save changes'}
         </button>
-        {saved && <span className="text-sm text-green-600 font-medium">\u2713 Saved</span>}
+        {saved && <span className="text-sm text-green-600 font-medium">✓ Saved</span>}
       </div>
     </div>
   )
