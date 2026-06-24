@@ -7,13 +7,41 @@ import {
   updateTaskPriority, updateTaskDueDate, updateTaskTool, deleteTask,
 } from './actions';
 
+interface ToolDef {
+  slug: string
+  label: string
+  icon: string
+  color: string
+  url?: string
+}
+
 interface Props {
   projectId: string;
   tasks: TaskRow[];
   canEditMeta: boolean;
   canDelete: boolean;
-  tools?: { slug: string; label: string; icon: string; color: string }[];
+  tools?: ToolDef[];
   team?: string[];
+}
+
+function faviconUrl(url: string | undefined): string | null {
+  if (!url || url.trim() === '') return null
+  const domain = url.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+  return 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=32'
+}
+
+function ToolBadge({ tool }: { tool: ToolDef }) {
+  const favicon = faviconUrl(tool.url)
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: tool.color }}>
+      {favicon ? (
+        <img src={favicon} alt="" width={12} height={12} className="rounded-sm" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+      ) : (
+        <span>{tool.icon}</span>
+      )}
+      {tool.label}
+    </span>
+  )
 }
 
 const STATUS_STYLES: Record<TaskRow['status'], string> = {
@@ -55,7 +83,7 @@ export default function TaskList({ projectId, tasks, canEditMeta, canDelete, too
 
 function TaskItem({
   t, projectId, canEditMeta, canDelete, tools, team,
-}: { t: TaskRow; projectId: string; canEditMeta: boolean; canDelete: boolean; tools: { slug: string; label: string; icon: string; color: string }[]; team: string[] }) {
+}: { t: TaskRow; projectId: string; canEditMeta: boolean; canDelete: boolean; tools: ToolDef[]; team: string[] }) {
   const [expanded, setExpanded] = useState(false);
   const toolMap = Object.fromEntries(tools.map(t => [t.slug, t]));
   const taskTool = (t as any).tool ? toolMap[(t as any).tool] : null;
@@ -82,11 +110,7 @@ function TaskItem({
           <div className="flex items-center gap-2 flex-wrap">
             <span className={'inline-block w-2 h-2 rounded-full ' + PRIORITY_DOT[t.priority]} />
             <span className="font-medium text-slate-900 text-sm">{t.name}</span>
-            {taskTool && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: taskTool.color }}>
-                {taskTool.icon} {taskTool.label}
-              </span>
-            )}
+            {taskTool && <ToolBadge tool={taskTool} />}
           </div>
           <div className="flex items-center gap-3 mt-1 text-xs text-slate-600 flex-wrap">
             <span>👤 {t.assigned_to ?? <em className="italic text-slate-400">unassigned</em>}</span>
