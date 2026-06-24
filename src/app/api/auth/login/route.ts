@@ -14,10 +14,10 @@ interface TeamMember {
 }
 
 const DEFAULT_USERS: TeamMember[] = [
-  { id: 'olivier', name: 'Olivier Attia',  email: 'olivier@gershonconsulting.com',       role: 'admin' },
-  { id: 'winnie',  name: 'Winnie Lauren',  email: 'winnie.lauren@gershonconsulting.com', role: 'team'  },
-  { id: 'aina',    name: 'Aina Rama',      email: 'aina.rama@gershonconsulting.com',     role: 'team'  },
-  { id: 'sai',     name: 'Sai',            email: 'sai@gershonconsulting.com',           role: 'team'  },
+  { id: 'olivier', name: 'Olivier Attia', email: 'olivier@gershonconsulting.com', role: 'admin' },
+  { id: 'winnie', name: 'Winnie Lauren', email: 'winnie.lauren@gershonconsulting.com', role: 'team' },
+  { id: 'aina', name: 'Aina Rama', email: 'aina.rama@gershonconsulting.com', role: 'team' },
+  { id: 'sai', name: 'Sai', email: 'sai@gershonconsulting.com', role: 'team' },
 ]
 
 async function loadTeam(): Promise<TeamMember[]> {
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   }
 
   const session = await getIronSession<SessionData>(await cookies(), getSessionOptions())
-  session.user = { id: user.id, name: user.name, email: user.email }
+  session.user = { id: user.id, name: user.name, email: user.email, role: user.role }
   await session.save()
   return NextResponse.json({ ok: true })
 }
