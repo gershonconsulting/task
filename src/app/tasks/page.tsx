@@ -7,27 +7,27 @@ import { updateTaskStatusGlobal } from '@/lib/actions'
 import Link from 'next/link'
 import { getTemplate } from '@/lib/templates'
 
-const PROVIDERS = ['Winnie Lauren', 'Aina Rama', 'Olivier', 'Sai']
+const DEFAULT_PROVIDERS = ['Winnie Lauren', 'Aina Rama', 'Olivier', 'Sai']
 
 const NEXT_STATUS: Record<string, string> = {
-  pending:     'in_progress',
+  pending: 'in_progress',
   in_progress: 'completed',
-  completed:   'pending',
+  completed: 'pending',
 }
 const STATUS_LABEL: Record<string, string> = {
-  pending:     'Pending',
+  pending: 'Pending',
   in_progress: 'In progress',
-  completed:   'Done',
+  completed: 'Done',
 }
 const STATUS_STYLE: Record<string, string> = {
-  pending:     'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200',
+  pending: 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200',
   in_progress: 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200',
-  completed:   'bg-green-100 text-green-700 border-green-300 hover:bg-green-200',
+  completed: 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200',
 }
 const PRIORITY_DOT: Record<string, string> = {
-  high:   'bg-red-400',
+  high: 'bg-red-400',
   medium: 'bg-amber-400',
-  low:    'bg-slate-300',
+  low: 'bg-slate-300',
 }
 
 export default async function TasksPage({
@@ -39,10 +39,20 @@ export default async function TasksPage({
   const { provider, status } = await searchParams
   const supa = supabaseAdmin()
 
-  const [tasksResult, projectsResult] = await Promise.all([
+  const [tasksResult, projectsResult, teamSetting] = await Promise.all([
     supa.from('tasks').select('*'),
     supa.from('projects').select('id, company_name, client_email, template_slug'),
+    supa.from('app_settings').select('value').eq('key', 'team_members').single(),
   ])
+
+  let providers = DEFAULT_PROVIDERS
+  try {
+    if (teamSetting.data?.value) {
+      const members = JSON.parse(teamSetting.data.value) as { name: string }[]
+      const names = members.map(m => m.name).filter(Boolean)
+      if (names.length > 0) providers = names
+    }
+  } catch { /* use defaults */ }
 
   const allTasks = (tasksResult.data ?? []) as Array<{
     id: string; name: string; status: string | null; assigned_to: string | null;
@@ -52,7 +62,7 @@ export default async function TasksPage({
 
   let filtered = allTasks
   if (provider && provider !== 'all') filtered = filtered.filter(t => t.assigned_to === provider)
-  if (status  && status  !== 'all') filtered = filtered.filter(t => t.status === status)
+  if (status && status !== 'all') filtered = filtered.filter(t => t.status === status)
 
   const STATUS_ORDER: Record<string, number> = { pending: 0, in_progress: 1, completed: 2 }
   filtered = filtered.slice().sort((a, b) => {
@@ -63,7 +73,7 @@ export default async function TasksPage({
   })
 
   const activeProvider = provider ?? 'all'
-  const activeStatus   = status   ?? 'all'
+  const activeStatus = status ?? 'all'
 
   function filterLink(p?: string, s?: string) {
     const params = new URLSearchParams()
@@ -73,10 +83,10 @@ export default async function TasksPage({
     return '/tasks' + (qs ? '?' + qs : '')
   }
 
-  const today      = new Date().toISOString().slice(0, 10)
+  const today = new Date().toISOString().slice(0, 10)
   const totalCount = filtered.length
-  const doneCount  = filtered.filter(t => t.status === 'completed').length
-  const openCount  = filtered.filter(t => t.status !== 'completed').length
+  const doneCount = filtered.filter(t => t.status === 'completed').length
+  const openCount = filtered.filter(t => t.status !== 'completed').length
 
   return (
     <AppShell userName={user.name} userRole={user.role} pageTitle="Tasks" pageSubtitle="All tasks — click status badge to update">
@@ -84,7 +94,7 @@ export default async function TasksPage({
       {/* Provider filter */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider mr-1">Provider:</span>
-        {['all', ...PROVIDERS].map(p => (
+        {['all', ...providers].map(p => (
           <Link key={p} href={filterLink(p, activeStatus)}
             className={`px-3 py-1.5 rounded-full text-sm font-medium border transition ${
               activeProvider === p
@@ -126,50 +136,37 @@ export default async function TasksPage({
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="divide-y divide-slate-50">
             {filtered.map(t => {
-              const st     = t.status ?? 'pending'
+              const st = t.status ?? 'pending'
               const nextSt = NEXT_STATUS[st] ?? 'pending'
-              const proj   = projectMap.get(t.project_id ?? '')
-              const tpl    = proj ? getTemplate((proj as {template_slug:string}).template_slug) : undefined
+              const proj = projectMap.get(t.project_id ?? '')
+              const tpl = proj ? getTemplate((proj as {template_slug:string}).template_slug) : undefined
               const overdue = t.due_date && t.due_date < today && st !== 'completed'
               return (
                 <div key={t.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition">
-                  {/* Priority dot */}
                   <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${PRIORITY_DOT[t.priority ?? 'medium'] ?? 'bg-slate-300'}`} />
-
-                  {/* Status toggle */}
                   <form action={updateTaskStatusGlobal}>
-                    <input type="hidden" name="taskId"    value={t.id} />
-                    <input type="hidden" name="status"    value={nextSt} />
+                    <input type="hidden" name="taskId" value={t.id} />
+                    <input type="hidden" name="status" value={nextSt} />
                     <input type="hidden" name="projectId" value={t.project_id ?? ''} />
                     <button type="submit" title={`Mark ${STATUS_LABEL[nextSt]}`}
                       className={`text-xs px-2.5 py-1 rounded-full border font-medium cursor-pointer transition shrink-0 ${STATUS_STYLE[st]}`}>
                       {STATUS_LABEL[st]}
                     </button>
                   </form>
-
-                  {/* Task name */}
                   <span className="flex-1 text-sm text-slate-800 truncate min-w-0">{t.name}</span>
-
-                  {/* Tool badge */}
                   {t.tool && (
                     <span className="text-xs bg-violet-50 text-violet-600 px-2 py-0.5 rounded-full border border-violet-200 shrink-0 hidden sm:inline">
                       {t.tool}
                     </span>
                   )}
-
-                  {/* Assignee */}
                   <span className="text-xs text-slate-400 shrink-0 hidden md:block w-24 truncate text-right">
                     {t.assigned_to ? t.assigned_to.split(' ')[0] : '—'}
                   </span>
-
-                  {/* Due date */}
                   {t.due_date && (
                     <span className={`text-xs shrink-0 hidden lg:block ${overdue ? 'text-red-500 font-medium' : 'text-slate-400'}`}>
                       {overdue ? '⚠ ' : ''}{new Date(t.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </span>
                   )}
-
-                  {/* Project link */}
                   {proj && (
                     <Link href={"/projects/" + (proj as {id:string}).id} className="text-xs text-slate-300 hover:text-indigo-500 shrink-0 hidden xl:flex items-center gap-1">
                       <span>{tpl?.icon ?? '📁'}</span>
@@ -184,4 +181,4 @@ export default async function TasksPage({
       )}
     </AppShell>
   )
-                  }
+}
