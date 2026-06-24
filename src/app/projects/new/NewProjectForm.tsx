@@ -1,18 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { TEMPLATES, type ProcessTemplate } from '@/lib/templates';
 
-// Category display metadata
 const CATEGORY_META: Record<string, { hint: string }> = {
-  'Setup & Lifecycle':  { hint: 'Run once per client engagement.' },
-  'Monthly Recurring':  { hint: 'Auto-created every month — or create one manually.' },
-  'Onboarding':         { hint: 'One-time service setup for a client.' },
-  'Billing':            { hint: 'Finance side of the engagement.' },
-  'People & Partners':  { hint: 'Internal team & external partner onboarding.' },
+  'Setup & Lifecycle': { hint: 'Run once per client engagement.' },
+  'Monthly Recurring': { hint: 'Auto-created every month.' },
+  'Onboarding': { hint: 'One-time service setup for a client.' },
+  'Billing': { hint: 'Finance side of the engagement.' },
+  'People & Partners': { hint: 'Internal team & external partner onboarding.' },
 };
-// Preferred display order
 const CATEGORY_ORDER = ['Setup & Lifecycle', 'Monthly Recurring', 'Onboarding', 'Billing', 'People & Partners'];
 
 function groupedTemplates(): { label: string; hint: string; items: ProcessTemplate[] }[] {
@@ -24,22 +22,28 @@ function groupedTemplates(): { label: string; hint: string; items: ProcessTempla
   }
   return CATEGORY_ORDER
     .filter(cat => grouped[cat]?.length)
-    .map(cat => ({
-      label: cat,
-      hint: CATEGORY_META[cat]?.hint ?? '',
-      items: grouped[cat],
-    }));
+    .map(cat => ({ label: cat, hint: CATEGORY_META[cat]?.hint ?? '', items: grouped[cat] }));
 }
+
+interface ExistingClient { id: string; name: string; email: string }
 
 export default function NewProjectForm() {
   const router = useRouter();
   const [templateSlug, setTemplateSlug] = useState<string>('client-onboarding');
+  const [clientMode, setClientMode] = useState<'new' | 'existing'>('new');
+  const [existingClients, setExistingClients] = useState<ExistingClient[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [showMore, setShowMore] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successInfo, setSuccessInfo] = useState<{ projectId: string; tempPassword?: string } | null>(null);
 
-  const groups  = groupedTemplates();
+  const groups = groupedTemplates();
   const selected = TEMPLATES.find(t => t.slug === templateSlug);
+
+  useEffect(() => {
+    fetch('/api/clients').then(r => r.json()).then(data => { if (data.clients?.length) setExistingClients(data.clients) }).catch(() => {});
+  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -49,32 +53,46 @@ export default function NewProjectForm() {
     const body: Record<string, string> = {};
     fd.forEach((v, k) => { body[k] = String(v); });
     body.templateSlug = templateSlug;
+    if (clientMode === 'existing') body.existingClientId = selectedClientId;
     try {
-      const res = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      const res = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json();
       if (res.ok && data.ok) {
-        router.push(`/projects/${data.projectId}`);
+        if (data.tempPassword) {
+          setSuccessInfo({ projectId: data.projectId, tempPassword: data.tempPassword });
+        } else {
+          router.push('/projects/' + data.projectId);
+        }
       } else {
         setError(data.error ?? 'Failed to create project.');
       }
-    } catch {
-      setError('Network error. Please try again.');
-    } finally {
-      setPending(false);
-    }
+    } catch { setError('Network error.'); } finally { setPending(false); }
+  }
+
+  if (successInfo) {
+    return (
+      <div className="max-w-lg mx-auto bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-4">
+        <h2 className="text-lg font-semibold text-slate-900">Project created!</h2>
+        {successInfo.tempPassword && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <p className="text-sm font-semibold text-amber-800 mb-1">Client login credentials</p>
+            <p className="text-xs text-amber-700 mb-3">Share with client. They must change password on first login.</p>
+            <div className="font-mono text-sm bg-white border border-amber-300 rounded-md p-3 space-y-1">
+              <div>URL: <strong>task.gershoncrm.com/login</strong> (Client tab)</div>
+              <div>Password: <strong className="text-indigo-700 text-base">{successInfo.tempPassword}</strong></div>
+            </div>
+            <button type="button" onClick={() => navigator.clipboard.writeText(successInfo.tempPassword!)} className="mt-2 text-xs text-amber-700 underline">Copy password</button>
+          </div>
+        )}
+        <button onClick={() => router.push('/projects/' + successInfo.projectId)} className="w-full px-5 py-2.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold">Go to project →</button>
+      </div>
+    );
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Step 1 — grouped template picker */}
       <fieldset className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm">
-        <legend className="px-2 text-xs uppercase tracking-wider font-bold text-indigo-700">
-          1. Pick a template
-        </legend>
+        <legend className="px-2 text-xs uppercase tracking-wider font-bold text-indigo-700">1. Pick a template</legend>
         <div className="space-y-5 mt-2">
           {groups.map((g) => (
             <div key={g.label}>
@@ -86,16 +104,9 @@ export default function NewProjectForm() {
                 {g.items.map((t) => {
                   const sel = t.slug === templateSlug;
                   return (
-                    <button
-                      key={t.slug}
-                      type="button"
-                      onClick={() => setTemplateSlug(t.slug)}
-                      className={`text-left p-3 rounded-md border-2 transition ${sel ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 hover:border-slate-300 bg-white'}`}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xl">{t.icon}</span>
-                        <span className="font-semibold text-sm text-slate-900">{t.label}</span>
-                      </div>
+                    <button key={t.slug} type="button" onClick={() => setTemplateSlug(t.slug)}
+                      className={`text-left p-3 rounded-md border-2 transition ${sel ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
+                      <div className="flex items-center gap-2 mb-1"><span className="text-xl">{t.icon}</span><span className="font-semibold text-sm text-slate-900">{t.label}</span></div>
                       <div className="text-xs text-slate-500">{t.tasks.length} tasks</div>
                     </button>
                   );
@@ -106,51 +117,43 @@ export default function NewProjectForm() {
         </div>
       </fieldset>
 
-      {/* Step 2 — client info */}
       <fieldset className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm">
-        <legend className="px-2 text-xs uppercase tracking-wider font-bold text-indigo-700">
-          2. Name & email
-        </legend>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-          <Field name="companyName" label="Project name *" placeholder={selected?.label === 'Client Onboarding' ? 'e.g. TechFlow Inc.' : 'e.g. TechFlow — Jun 2026'} required />
-          <Field name="clientEmail" label="Client email *" type="email" required />
+        <legend className="px-2 text-xs uppercase tracking-wider font-bold text-indigo-700">2. Client</legend>
+        <div className="flex gap-1 bg-slate-100 rounded-lg p-1 mb-4 mt-2 w-fit">
+          <button type="button" onClick={() => setClientMode('new')} className={`px-4 py-1.5 text-sm font-semibold rounded-md transition ${clientMode === 'new' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'}`}>New client</button>
+          <button type="button" onClick={() => setClientMode('existing')} className={`px-4 py-1.5 text-sm font-semibold rounded-md transition ${clientMode === 'existing' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'}`}>Existing client</button>
         </div>
-
-        <button
-          type="button"
-          onClick={() => setShowMore(v => !v)}
-          className="mt-4 text-xs text-indigo-600 hover:text-indigo-800"
-        >
-          {showMore ? '× Hide optional details' : '+ Add optional details (contact, dates, LinkedIn URL)'}
-        </button>
-
-        {showMore && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-200">
+        {clientMode === 'existing' ? (
+          <div className="space-y-3">
+            {existingClients.length === 0 ? <p className="text-sm text-slate-400 italic">No existing clients yet.</p> : (
+              <label className="block">
+                <span className="block text-xs font-semibold text-slate-700 mb-1">Select client</span>
+                <select value={selectedClientId} onChange={e => setSelectedClientId(e.target.value)} required className="w-full px-3 py-2 rounded-md border border-slate-300 text-sm focus:outline-none focus:border-indigo-500">
+                  <option value="">— Pick a client —</option>
+                  {existingClients.map(c => <option key={c.id} value={c.id}>{c.name || c.email} ({c.email})</option>)}
+                </select>
+              </label>
+            )}
+            <Field name="companyName" label="Project name *" placeholder="e.g. TechFlow — Monthly Report" required />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field name="companyName" label="Project name *" placeholder="e.g. TechFlow Inc." required />
+            <Field name="clientEmail" label="Client email *" type="email" required />
             <Field name="clientFirstName" label="First name" />
-            <Field name="clientLastName"  label="Last name" />
-            <Field name="clientTitle"     label="Title" />
-            <Field name="clientLinkedinUrl" label="LinkedIn URL" placeholder="linkedin.com/in/…" />
-            <Field name="clientDomain"    label="Domain" placeholder="example.com" />
-            <div />
-            <Field name="startDate" label="Start date (defaults to today)" type="date" />
-            <Field name="endDate"   label="End date" type="date" />
+            <Field name="clientLastName" label="Last name" />
+            <button type="button" onClick={() => setShowMore(v => !v)} className="sm:col-span-2 text-xs text-indigo-600 hover:text-indigo-800 text-left">
+              {showMore ? '× Hide optional details' : '+ Add optional details'}
+            </button>
+            {showMore && (<><Field name="clientTitle" label="Title" /><Field name="clientLinkedinUrl" label="LinkedIn URL" /><Field name="clientDomain" label="Domain" /><div /><Field name="startDate" label="Start date" type="date" /><Field name="endDate" label="End date" type="date" /></>)}
           </div>
         )}
       </fieldset>
 
-      {error && (
-        <div className="p-3 rounded-md bg-red-50 border border-red-200 text-red-800 text-sm">
-          {error}
-        </div>
-      )}
-
+      {error && <div className="p-3 rounded-md bg-red-50 border border-red-200 text-red-800 text-sm">{error}</div>}
       <div className="flex items-center justify-between">
         <a href="/projects" className="text-sm text-slate-500 hover:text-slate-700">← Cancel</a>
-        <button
-          type="submit"
-          disabled={pending}
-          className="px-5 py-2.5 rounded-md bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white text-sm font-semibold"
-        >
+        <button type="submit" disabled={pending || (clientMode === 'existing' && !selectedClientId)} className="px-5 py-2.5 rounded-md bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white text-sm font-semibold">
           {pending ? 'Creating…' : `Create — ${selected?.tasks.length ?? 0} tasks`}
         </button>
       </div>
@@ -158,19 +161,11 @@ export default function NewProjectForm() {
   );
 }
 
-function Field({
-  name, label, type = 'text', placeholder, required,
-}: { name: string; label: string; type?: string; placeholder?: string; required?: boolean }) {
+function Field({ name, label, type = 'text', placeholder, required }: { name: string; label: string; type?: string; placeholder?: string; required?: boolean }) {
   return (
     <label className="block">
       <span className="block text-xs font-semibold text-slate-700 mb-1">{label}</span>
-      <input
-        name={name}
-        type={type}
-        placeholder={placeholder}
-        required={required}
-        className="w-full px-3 py-2 rounded-md border border-slate-300 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-      />
+      <input name={name} type={type} placeholder={placeholder} required={required} className="w-full px-3 py-2 rounded-md border border-slate-300 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
     </label>
   );
-    }
+}
