@@ -3,6 +3,7 @@
 
 import { supabaseAdmin } from './supabaseServer';
 import { getTemplate } from './templates';
+import type { ProjectType } from './templates';
 
 export interface NewProjectInput {
   templateSlug: string;
@@ -16,6 +17,7 @@ export interface NewProjectInput {
   startDate?: string; // YYYY-MM-DD, defaults to today
   endDate?: string;
   createdByEmail: string;
+  projectType?: ProjectType; // simple | advanced | complex
 }
 
 export interface NewProjectResult {
@@ -46,6 +48,7 @@ export async function createProjectFromTemplate(input: NewProjectInput): Promise
       start_date: start,
       end_date: input.endDate ?? null,
       created_by_email: input.createdByEmail,
+      project_type: input.projectType ?? tpl.projectType ?? 'advanced',
     })
     .select('id')
     .single();
