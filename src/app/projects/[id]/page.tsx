@@ -9,6 +9,8 @@ import TaskList from './TaskList'
 import { deleteProject } from './actions'
 import Link from 'next/link'
 
+const DEFAULT_TEAM = ['Olivier', 'Winnie Lauren', 'Aina Rama', 'Sai']
+
 export default async function ProjectDetailPage(props: { params: Promise<{ id: string }> }) {
   const { id } = await props.params
   const user = await getCurrentUser()
@@ -21,11 +23,19 @@ export default async function ProjectDetailPage(props: { params: Promise<{ id: s
   const { data: tasks } = await supa.from('tasks').select('*').eq('project_id', id).order('position', { ascending: true })
   const taskRows = (tasks ?? []) as TaskRow[]
 
-  // Load tools from app_settings (fall back to defaults if table not yet created)
+  // Load tools and team from app_settings
   let tools = DEFAULT_TOOLS
+  let team = DEFAULT_TEAM
   try {
-    const { data: setting } = await supa.from('app_settings').select('value').eq('key', 'tools').single()
-    if (setting?.value) tools = JSON.parse(setting.value)
+    const [toolsSetting, teamSetting] = await Promise.all([
+      supa.from('app_settings').select('value').eq('key', 'tools').single(),
+      supa.from('app_settings').select('value').eq('key', 'team_members').single(),
+    ])
+    if (toolsSetting.data?.value) tools = JSON.parse(toolsSetting.data.value)
+    if (teamSetting.data?.value) {
+      const members = JSON.parse(teamSetting.data.value) as { name: string }[]
+      team = members.map(m => m.name).filter(Boolean)
+    }
   } catch { /* use defaults */ }
 
   const tpl = getTemplate(p.template_slug)
@@ -72,7 +82,7 @@ export default async function ProjectDetailPage(props: { params: Promise<{ id: s
         </div>
       </section>
 
-      <TaskList projectId={p.id} tasks={taskRows} canEditMeta={true} canDelete={true} tools={tools} />
+      <TaskList projectId={p.id} tasks={taskRows} canEditMeta={true} canDelete={true} tools={tools} team={team} />
 
       <form action={deleteProject} className="mt-10 border-t border-red-100 pt-5">
         <input type="hidden" name="projectId" value={p.id} />
