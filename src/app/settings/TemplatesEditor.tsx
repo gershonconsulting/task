@@ -9,6 +9,7 @@ interface Tool {
   label: string
   icon: string
   color: string
+  url?: string
 }
 
 interface TemplateTask {
@@ -38,6 +39,38 @@ function priorityColor(p: Priority | undefined) {
   return 'text-amber-600 bg-amber-50'
 }
 
+function faviconUrl(url: string | undefined): string | null {
+  if (!url || url.trim() === '') return null
+  try {
+    const domain = url.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+    return 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=32'
+  } catch {
+    return null
+  }
+}
+
+interface ToolIconProps {
+  tool: Tool
+  size?: number
+}
+
+function ToolIcon({ tool, size = 20 }: ToolIconProps) {
+  const favicon = faviconUrl(tool.url)
+  if (favicon) {
+    return (
+      <img
+        src={favicon}
+        alt={tool.label}
+        width={size}
+        height={size}
+        className="rounded-sm object-contain"
+        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+      />
+    )
+  }
+  return <span style={{ fontSize: size - 4 }}>{tool.icon || '\ud83d\udd27'}</span>
+}
+
 interface ToolsEditorProps {
   tools: Tool[]
   onChange: (tools: Tool[]) => void
@@ -53,24 +86,28 @@ function ToolsEditor({ tools, onChange }: ToolsEditorProps) {
     onChange(tools.filter((_, i) => i !== idx))
   }
   function addTool() {
-    onChange([...tools, { slug: 'new-tool-' + Date.now(), label: 'New Tool', icon: '🔧', color: '#6366f1' }])
+    onChange([...tools, { slug: 'new-tool-' + Date.now(), label: 'New Tool', icon: '\ud83d\udd27', color: '#6366f1', url: '' }])
   }
 
   return (
     <div className="space-y-2">
       {tools.map((tool, idx) => (
         <div key={tool.slug} className="flex items-center gap-2 p-2 bg-slate-50 rounded-md">
-          <input
-            value={tool.icon}
-            onChange={e => updateTool(idx, { icon: e.target.value })}
-            className="w-10 text-center px-1 py-1.5 rounded border border-slate-200 text-sm bg-white"
-            placeholder="🔧"
-          />
+          <div className="w-8 h-8 flex items-center justify-center bg-white rounded border border-slate-200 shrink-0">
+            <ToolIcon tool={tool} size={20} />
+          </div>
           <input
             value={tool.label}
             onChange={e => updateTool(idx, { label: e.target.value, slug: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-') })}
             className="flex-1 px-2 py-1.5 rounded border border-slate-200 text-sm bg-white"
             placeholder="Tool name"
+          />
+          <input
+            value={tool.url ?? ''}
+            onChange={e => updateTool(idx, { url: e.target.value })}
+            className="w-36 px-2 py-1.5 rounded border border-slate-200 text-xs bg-white text-slate-500"
+            placeholder="website.com"
+            title="Website domain for auto icon"
           />
           <div className="flex items-center gap-1">
             <input
@@ -82,17 +119,18 @@ function ToolsEditor({ tools, onChange }: ToolsEditorProps) {
             />
           </div>
           <span
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white"
+            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium text-white"
             style={{ backgroundColor: tool.color }}
           >
-            {tool.icon} {tool.label}
+            <ToolIcon tool={tool} size={14} />
+            {tool.label}
           </span>
           <button
             type="button"
             onClick={() => removeTool(idx)}
             className="text-red-400 hover:text-red-600 text-xs font-bold px-1"
             title="Remove tool"
-          >✕</button>
+          >\u2715</button>
         </div>
       ))}
       <button
@@ -213,7 +251,7 @@ export default function TemplatesEditor() {
       <div>
         <h2 className="text-base font-semibold text-slate-900 mb-1">Tools</h2>
         <p className="text-sm text-slate-500 mb-3">
-          Define the tools your team uses. Each task can be tagged with one tool.
+          Define the tools your team uses. Enter the website domain to auto-load the app icon.
         </p>
         <ToolsEditor tools={tools} onChange={t => { setTools(t); setSaved(false) }} />
       </div>
@@ -248,7 +286,7 @@ export default function TemplatesEditor() {
                       <div className="text-xs text-slate-400">{tasks.length} tasks</div>
                     </div>
                   </div>
-                  <span className="text-slate-400 text-xs">{isOpen ? '▲' : '▼'}</span>
+                  <span className="text-slate-400 text-xs">{isOpen ? '\u25b2' : '\u25bc'}</span>
                 </button>
 
                 {isOpen && (
@@ -259,9 +297,9 @@ export default function TemplatesEditor() {
                         <div key={task.id} className="flex items-start gap-2 p-3 bg-slate-50 rounded-md">
                           <div className="flex flex-col gap-0.5 pt-1">
                             <button type="button" onClick={() => moveTask(tpl.slug, idx, -1)} disabled={idx === 0}
-                              className="text-slate-300 hover:text-slate-600 disabled:opacity-20 text-xs leading-none" title="Move up">▲</button>
+                              className="text-slate-300 hover:text-slate-600 disabled:opacity-20 text-xs leading-none" title="Move up">\u25b2</button>
                             <button type="button" onClick={() => moveTask(tpl.slug, idx, 1)} disabled={idx === tasks.length - 1}
-                              className="text-slate-300 hover:text-slate-600 disabled:opacity-20 text-xs leading-none" title="Move down">▼</button>
+                              className="text-slate-300 hover:text-slate-600 disabled:opacity-20 text-xs leading-none" title="Move down">\u25bc</button>
                           </div>
 
                           <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-2">
@@ -297,7 +335,7 @@ export default function TemplatesEditor() {
                               <select
                                 value={task.priority ?? 'medium'}
                                 onChange={e => updateTask(tpl.slug, idx, { priority: e.target.value as Priority })}
-                                className={`px-2 py-1.5 rounded border border-slate-200 text-xs font-medium focus:outline-none focus:border-indigo-400 ${priorityColor(task.priority)}`}
+                                className={'px-2 py-1.5 rounded border border-slate-200 text-xs font-medium focus:outline-none focus:border-indigo-400 ' + priorityColor(task.priority)}
                               >
                                 {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
                               </select>
@@ -311,14 +349,15 @@ export default function TemplatesEditor() {
                               />
                               {taskTool && (
                                 <span
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white whitespace-nowrap"
+                                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium text-white whitespace-nowrap"
                                   style={{ backgroundColor: taskTool.color }}
                                 >
-                                  {taskTool.icon} {taskTool.label}
+                                  <ToolIcon tool={taskTool} size={14} />
+                                  {taskTool.label}
                                 </span>
                               )}
                               <button type="button" onClick={() => removeTask(tpl.slug, idx)}
-                                className="ml-auto text-red-400 hover:text-red-600 text-xs font-bold px-1" title="Remove task">✕</button>
+                                className="ml-auto text-red-400 hover:text-red-600 text-xs font-bold px-1" title="Remove task">\u2715</button>
                             </div>
                           </div>
                         </div>
@@ -330,7 +369,7 @@ export default function TemplatesEditor() {
                         className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">+ Add task</button>
                       {isModified && (
                         <button type="button" onClick={() => resetTemplate(tpl.slug)}
-                          className="text-xs text-slate-400 hover:text-slate-600">↺ Reset to default</button>
+                          className="text-xs text-slate-400 hover:text-slate-600">\u21ba Reset to default</button>
                       )}
                     </div>
                   </div>
@@ -348,9 +387,9 @@ export default function TemplatesEditor() {
           disabled={saving}
           className="px-5 py-2.5 rounded-md bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white text-sm font-semibold"
         >
-          {saving ? 'Saving…' : 'Save changes'}
+          {saving ? 'Saving\u2026' : 'Save changes'}
         </button>
-        {saved && <span className="text-sm text-green-600 font-medium">✓ Saved</span>}
+        {saved && <span className="text-sm text-green-600 font-medium">\u2713 Saved</span>}
       </div>
     </div>
   )
