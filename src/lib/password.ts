@@ -1,7 +1,7 @@
 // Web Crypto PBKDF2 password hashing — works on Cloudflare edge runtime (no Node.js needed)
 // Format: pbkdf2:sha256:310000:<salt_hex>:<hash_hex>
 
-const ITERATIONS = 310_000;
+const ITERATIONS = 100_000; // Cloudflare Workers Web Crypto caps PBKDF2 at 100k iterations
 const HASH = 'SHA-256';
 
 function hexEncode(buf: ArrayBuffer): string {
