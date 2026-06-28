@@ -146,7 +146,7 @@ export default async function TasksPage({
                 <div key={t.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition">
                   <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${PRIORITY_DOT[t.priority ?? 'medium'] ?? 'bg-slate-300'}`} />
                   <StatusSelect taskId={t.id} projectId={t.project_id ?? ''} status={st} />
-                  <span className="flex-1 text-sm text-slate-800 truncate min-w-0">{t.name}</span>
+                  <span className="flex-1 min-w-0 flex items-center gap-2"><span className="text-sm text-slate-800 truncate">{t.name}</span>{proj && (<Link href={"/projects/" + (proj as {id:string}).id} className="text-xs text-slate-400 hover:text-indigo-600 shrink-0 inline-flex items-center gap-1"><span>{tpl?.icon ?? '📁'}</span><span className="truncate max-w-[160px]">{(proj as {company_name:string}).company_name}</span></Link>)}</span>
                   {t.tool && (
                     <span className="text-xs bg-violet-50 text-violet-600 px-2 py-0.5 rounded-full border border-violet-200 shrink-0 hidden sm:inline">
                       {t.tool}
@@ -159,12 +159,6 @@ export default async function TasksPage({
                     <span className={`text-xs shrink-0 hidden lg:block ${overdue ? 'text-red-500 font-medium' : 'text-slate-400'}`}>
                       {overdue ? '⚠ ' : ''}{new Date(t.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </span>
-                  )}
-                  {proj && (
-                    <Link href={"/projects/" + (proj as {id:string}).id} className="text-xs text-slate-300 hover:text-indigo-500 shrink-0 hidden xl:flex items-center gap-1">
-                      <span>{tpl?.icon ?? '📁'}</span>
-                      <span className="max-w-[100px] truncate">{(proj as {company_name:string}).company_name}</span>
-                    </Link>
                   )}
                 </div>
               )
