@@ -6,6 +6,7 @@ import { supabaseAdmin } from '@/lib/supabaseServer'
 import { updateTaskStatusGlobal } from '@/lib/actions'
 import Link from 'next/link'
 import { getTemplate } from '@/lib/templates'
+import StatusSelect from './StatusSelect'
 
 const DEFAULT_PROVIDERS = ['Winnie Lauren', 'Aina Rama', 'Olivier', 'Sai']
 
@@ -144,15 +145,7 @@ export default async function TasksPage({
               return (
                 <div key={t.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition">
                   <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${PRIORITY_DOT[t.priority ?? 'medium'] ?? 'bg-slate-300'}`} />
-                  <form action={updateTaskStatusGlobal}>
-                    <input type="hidden" name="taskId" value={t.id} />
-                    <input type="hidden" name="status" value={nextSt} />
-                    <input type="hidden" name="projectId" value={t.project_id ?? ''} />
-                    <button type="submit" title={`Mark ${STATUS_LABEL[nextSt]}`}
-                      className={`text-xs px-2.5 py-1 rounded-full border font-medium cursor-pointer transition shrink-0 ${STATUS_STYLE[st]}`}>
-                      {STATUS_LABEL[st]}
-                    </button>
-                  </form>
+                  <StatusSelect taskId={t.id} projectId={t.project_id ?? ''} status={st} />
                   <span className="flex-1 text-sm text-slate-800 truncate min-w-0">{t.name}</span>
                   {t.tool && (
                     <span className="text-xs bg-violet-50 text-violet-600 px-2 py-0.5 rounded-full border border-violet-200 shrink-0 hidden sm:inline">
