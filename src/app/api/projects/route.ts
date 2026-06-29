@@ -26,6 +26,8 @@ export async function POST(req: NextRequest) {
   const clientEmail = (body.clientEmail ?? '').trim().toLowerCase()
   const existingClientId = (body.existingClientId ?? '').trim()
   const projectType = ((body.projectType ?? 'advanced').trim()) as ProjectType
+  const pmRaw = (body.periodMonth ?? '').trim()
+  const periodMonthDate = pmRaw ? (pmRaw.length === 7 ? pmRaw + '-01' : pmRaw) : undefined
 
   if (!templateSlug || !getTemplate(templateSlug)) {
     return NextResponse.json({ error: 'Pick a valid template.' }, { status: 400 })
@@ -69,6 +71,7 @@ export async function POST(req: NextRequest) {
       startDate: (body.startDate ?? '').trim() || undefined,
       endDate: (body.endDate ?? '').trim() || undefined,
       createdByEmail,
+      periodMonth: periodMonthDate,
       projectType,
     })
 
