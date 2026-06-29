@@ -6,9 +6,22 @@ import { hashPassword } from '@/lib/password'
 export async function GET() {
   try {
     const supa = supabaseAdmin()
-    const { data, error } = await supa.from('clients').select('id, name, email, project_ids, must_change_password, created_at').order('created_at', { ascending: false })
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    return NextResponse.json({ clients: data ?? [] })
+    const [clientsRes, projectsRes] = await Promise.all([
+      supa.from('clients').select('id, name, email, project_ids, must_change_password, created_at').order('created_at', { ascending: false }),
+      supa.from('projects').select('company_name, client_email, created_at').order('created_at', { ascending: false }),
+    ])
+    const byEmail = new Map()
+    for (const c of (clientsRes.data ?? [])) {
+      if (!c.email) continue
+      byEmail.set(String(c.email).toLowerCase(), { id: c.id, name: c.name || c.email, email: c.email, project_ids: c.project_ids ?? [], must_change_password: c.must_change_password ?? false, created_at: c.created_at })
+    }
+    for (const p of (projectsRes.data ?? [])) {
+      const email = (p.client_email ?? '').trim()
+      if (!email) continue
+      const key = email.toLowerCase()
+      if (!byEmail.has(key)) byEmail.set(key, { id: email, name: p.company_name || email, email, project_ids: [], must_change_password: false, created_at: p.created_at })
+    }
+    return NextResponse.json({ clients: Array.from(byEmail.values()) })
   } catch (e) { return NextResponse.json({ error: String(e) }, { status: 500 }) }
 }
 
