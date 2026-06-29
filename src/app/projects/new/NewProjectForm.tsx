@@ -49,11 +49,19 @@ function groupedTemplates(): { label: string; hint: string; items: ProcessTempla
 
 interface ExistingClient { id: string; name: string; email: string }
 
+const ONBOARD_SERVICES = [
+  { slug: 'social-content-creation-onboarding', label: 'Social Content Creation', code: 'PROMOTE' },
+  { slug: 'social-selling-onboarding', label: 'Social Selling', code: 'NETWORK' },
+  { slug: 'lead-generation-onboarding', label: 'Lead Generation', code: 'ENGAGE' },
+]
+
 export default function NewProjectForm() {
   const router = useRouter();
   const [projectType, setProjectType] = useState<ProjectType>('advanced');
   const [templateSlug, setTemplateSlug] = useState<string>('client-onboarding');
   const [clientMode, setClientMode] = useState<'new' | 'existing'>('new');
+  const [onboardMode, setOnboardMode] = useState(false);
+  const [selectedServices, setSelectedServices] = useState<string[]>(ONBOARD_SERVICES.map(s => s.slug));
   const [existingClients, setExistingClients] = useState<ExistingClient[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [showMore, setShowMore] = useState(false);
@@ -80,6 +88,22 @@ export default function NewProjectForm() {
     body.templateSlug = templateSlug;
     body.projectType = projectType;
     if (clientMode === 'existing') body.clientEmail = selectedClientId;
+    if (onboardMode) {
+      if (selectedServices.length === 0) { setError('Pick at least one service.'); setPending(false); return; }
+      let tempPwd: string | undefined; let firstId: string | undefined;
+      try {
+        for (const slug of selectedServices) {
+          const r = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, templateSlug: slug, projectType: undefined }) });
+          const d = await r.json();
+          if (!r.ok || !d.ok) { setError(d.error ?? 'Failed to create project.'); setPending(false); return; }
+          if (!firstId) firstId = d.projectId;
+          if (d.tempPassword) tempPwd = d.tempPassword;
+        }
+        if (tempPwd && firstId) setSuccessInfo({ projectId: firstId, tempPassword: tempPwd });
+        else router.push('/projects');
+      } catch { setError('Network error.'); } finally { setPending(false); }
+      return;
+    }
     try {
       const res = await fetch('/api/projects', {
         method: 'POST',
@@ -126,7 +150,35 @@ export default function NewProjectForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
 
-      {/* Step 1: Project type */}
+      {/* Mode toggle */}
+<div className='bg-white rounded-lg border border-slate-200 p-5 shadow-sm'>
+  <div className='flex gap-1 bg-slate-100 rounded-lg p-1 w-fit'>
+    <button type='button' onClick={() => setOnboardMode(false)} className={`px-4 py-1.5 text-sm font-semibold rounded-md transition ${!onboardMode ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'}`}>One project</button>
+    <button type='button' onClick={() => setOnboardMode(true)} className={`px-4 py-1.5 text-sm font-semibold rounded-md transition ${onboardMode ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'}`}>Onboard new client (3 services)</button>
+  </div>
+</div>
+
+{onboardMode && (
+  <fieldset className='bg-white rounded-lg border border-slate-200 p-5 shadow-sm'>
+    <legend className='px-2 text-xs uppercase tracking-wider font-bold text-indigo-700'>Services to set up</legend>
+    <p className='text-xs text-slate-500 mt-1 mb-3'>All three are selected by default. Uncheck any you do not want — one onboarding project is created per service.</p>
+    <div className='space-y-2'>
+      {ONBOARD_SERVICES.map(s => {
+        const checked = selectedServices.includes(s.slug)
+        return (
+          <label key={s.slug} className={`flex items-center gap-3 p-3 rounded-md border-2 cursor-pointer transition ${checked ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'}`}>
+            <input type='checkbox' checked={checked} onChange={() => setSelectedServices(prev => prev.includes(s.slug) ? prev.filter(x => x !== s.slug) : [...prev, s.slug])} className='w-4 h-4 accent-indigo-600' />
+            <span className='font-semibold text-sm text-slate-900'>{s.label}</span>
+            <span className='ml-auto text-[10px] font-bold tracking-wider text-slate-400'>{s.code}</span>
+          </label>
+        )
+      })}
+    </div>
+  </fieldset>
+)}
+
+{!onboardMode && (<>
+{/* Step 1: Project type */}
       <fieldset className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm">
         <legend className="px-2 text-xs uppercase tracking-wider font-bold text-indigo-700">1. Project type</legend>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
@@ -179,7 +231,9 @@ export default function NewProjectForm() {
         </div>
       </fieldset>
 
-      {/* Step 3: Client */}
+      </>)}
+
+{/* Step 3: Client */}
       <fieldset className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm">
         <legend className="px-2 text-xs uppercase tracking-wider font-bold text-indigo-700">3. Client</legend>
         <div className="flex gap-1 bg-slate-100 rounded-lg p-1 mb-4 mt-2 w-fit">
@@ -241,9 +295,9 @@ export default function NewProjectForm() {
       <div className="flex items-center justify-between">
         <a href="/projects" className="text-sm text-slate-500 hover:text-slate-700">← Cancel</a>
         <button type="submit"
-          disabled={pending || (clientMode === 'existing' && !selectedClientId)}
+          disabled={pending || (clientMode === 'existing' && !selectedClientId) || (onboardMode && selectedServices.length === 0)}
           className="px-5 py-2.5 rounded-md bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white text-sm font-semibold">
-          {pending ? 'Creating…' : `Create — ${selected?.tasks.length ?? 0} tasks (${projectType})`}
+          {pending ? 'Creating…' : onboardMode ? `Onboard client — ${selectedServices.length} project${selectedServices.length !== 1 ? 's' : ''}` : `Create — ${selected?.tasks.length ?? 0} tasks (${projectType})`}
         </button>
       </div>
     </form>
