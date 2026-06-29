@@ -49,6 +49,8 @@ function groupedTemplates(): { label: string; hint: string; items: ProcessTempla
 
 interface ExistingClient { id: string; name: string; email: string }
 
+const INTERNAL_EMAIL = 'internal@gershonconsulting.com'
+
 const ONBOARD_SERVICES = [
   { slug: 'social-content-creation-onboarding', label: 'Social Content Creation', code: 'PROMOTE' },
   { slug: 'social-selling-onboarding', label: 'Social Selling', code: 'NETWORK' },
@@ -59,7 +61,7 @@ export default function NewProjectForm() {
   const router = useRouter();
   const [projectType, setProjectType] = useState<ProjectType>('advanced');
   const [templateSlug, setTemplateSlug] = useState<string>('client-onboarding');
-  const [clientMode, setClientMode] = useState<'new' | 'existing'>('new');
+  const [clientMode, setClientMode] = useState<'new' | 'existing' | 'internal'>('new');
   const [onboardMode, setOnboardMode] = useState(false);
   const [selectedServices, setSelectedServices] = useState<string[]>(ONBOARD_SERVICES.map(s => s.slug));
   const [existingClients, setExistingClients] = useState<ExistingClient[]>([]);
@@ -87,6 +89,7 @@ export default function NewProjectForm() {
     fd.forEach((v, k) => { body[k] = String(v); });
     body.templateSlug = templateSlug;
     body.projectType = projectType;
+    if (clientMode === 'internal') { body.clientEmail = INTERNAL_EMAIL; body.clientFirstName = 'Gershon'; body.clientLastName = '— Internal'; }
     if (clientMode === 'existing') body.clientEmail = selectedClientId;
     if (onboardMode) {
       if (selectedServices.length === 0) { setError('Pick at least one service.'); setPending(false); return; }
@@ -245,8 +248,14 @@ export default function NewProjectForm() {
             className={`px-4 py-1.5 text-sm font-semibold rounded-md transition ${clientMode === 'existing' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'}`}>
             Existing client
           </button>
+              <button type='button' onClick={() => setClientMode('internal')} className={`px-4 py-1.5 text-sm font-semibold rounded-md transition ${clientMode === 'internal' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500'}`}>Internal (no client)</button>
         </div>
-        {clientMode === 'existing' ? (
+        {clientMode === 'internal' ? (
+              <div className='grid grid-cols-1 gap-4'>
+                <Field name='companyName' label='Project name *' placeholder='e.g. Website revamp (internal)' required />
+                <p className='text-xs text-slate-400'>Internal project — not tied to a client.</p>
+              </div>
+            ) : clientMode === 'existing' ? (
           <div className="space-y-3">
             {existingClients.length === 0
               ? <p className="text-sm text-slate-400 italic">No existing clients yet.</p>
