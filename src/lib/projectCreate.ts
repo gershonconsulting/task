@@ -16,6 +16,7 @@ export interface NewProjectInput {
   clientDomain?: string;
   startDate?: string; // YYYY-MM-DD, defaults to today
   endDate?: string;
+  periodMonth?: string; // YYYY-MM-01, optional
   createdByEmail: string;
   projectType?: ProjectType; // simple | advanced | complex
 }
@@ -47,6 +48,7 @@ export async function createProjectFromTemplate(input: NewProjectInput): Promise
       status: 'planning',
       start_date: start,
       end_date: input.endDate ?? null,
+        period_month: input.periodMonth ?? null,
       created_by_email: input.createdByEmail,
       project_type: input.projectType ?? tpl.projectType ?? 'advanced',
     })
