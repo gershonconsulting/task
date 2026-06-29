@@ -11,6 +11,7 @@ export default async function ProjectsPage() {
 
   let rows: ProjectProgressRow[] | null = null
   let dbError: string | null = null
+  const createdMap = new Map<string, string>()
   try {
     const { data, error } = await supabaseAdmin()
       .from('project_progress')
@@ -18,6 +19,8 @@ export default async function ProjectsPage() {
       .order('updated_at', { ascending: false })
     if (error) dbError = error.message
     else rows = data as ProjectProgressRow[]
+      const meta = await supabaseAdmin().from('projects').select('id, created_at')
+      for (const m of (meta.data ?? [])) createdMap.set(m.id as string, m.created_at as string)
   } catch (e: unknown) {
     dbError = e instanceof Error ? e.message : String(e)
   }
@@ -50,7 +53,7 @@ export default async function ProjectsPage() {
       {!dbError && rows && rows.length > 0 && (
         <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {rows.map((r) => (
-            <ProjectCard key={r.project_id} row={r} />
+            <ProjectCard key={r.project_id} row={r} createdAt={createdMap.get(r.project_id)} />
           ))}
         </ul>
       )}
@@ -58,7 +61,7 @@ export default async function ProjectsPage() {
   )
 }
 
-function ProjectCard({ row }: { row: ProjectProgressRow }) {
+function ProjectCard({ row, createdAt }: { row: ProjectProgressRow; createdAt?: string }) {
   const tpl = getTemplate(row.template_slug)
   const accent = tpl?.color ?? '#6366f1'
   return (
@@ -78,7 +81,7 @@ function ProjectCard({ row }: { row: ProjectProgressRow }) {
         </div>
         <div className="flex justify-between mt-3 text-xs">
           <span style={{ color: accent }}>{row.percent_complete}%</span>
-          <span className="text-slate-400">{new Date(row.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+          <span className="text-slate-400">{createdAt ? 'Created ' + new Date(createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : new Date(row.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
         </div>
       </Link>
     </li>
