@@ -79,7 +79,7 @@ export default function NewProjectForm() {
     fd.forEach((v, k) => { body[k] = String(v); });
     body.templateSlug = templateSlug;
     body.projectType = projectType;
-    if (clientMode === 'existing') body.existingClientId = selectedClientId;
+    if (clientMode === 'existing') body.clientEmail = selectedClientId;
     try {
       const res = await fetch('/api/projects', {
         method: 'POST',
@@ -203,7 +203,7 @@ export default function NewProjectForm() {
                     className="w-full px-3 py-2 rounded-md border border-slate-300 text-sm focus:outline-none focus:border-indigo-500">
                     <option value="">— Pick a client —</option>
                     {existingClients.map(c => (
-                      <option key={c.id} value={c.id}>{c.name || c.email} ({c.email})</option>
+                      <option key={c.email} value={c.email}>{c.name || c.email} ({c.email})</option>
                     ))}
                   </select>
                 </label>
