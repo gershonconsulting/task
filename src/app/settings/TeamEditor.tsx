@@ -6,6 +6,7 @@ interface TeamMember {
   id: string
   name: string
   email: string
+  linkedin?: string
   role: 'admin' | 'team'
 }
 
@@ -86,6 +87,13 @@ export default function TeamEditor() {
             placeholder="email@gershonconsulting.com"
             type="email"
             className="flex-[2] min-w-[180px] px-2 py-1.5 rounded border border-slate-200 text-sm bg-white focus:outline-none focus:border-indigo-400"
+          />
+          <input
+            value={m.linkedin ?? ''}
+            onChange={e => update(idx, { linkedin: e.target.value })}
+            placeholder='LinkedIn URL'
+            type='url'
+            className='flex-[2] min-w-[160px] px-2 py-1.5 rounded border border-slate-200 text-sm bg-white focus:outline-none focus:border-indigo-400'
           />
           <select
             value={m.role}
