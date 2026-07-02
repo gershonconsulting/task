@@ -33,6 +33,17 @@ export async function createProjectFromTemplate(input: NewProjectInput): Promise
   const start = input.startDate ?? new Date().toISOString().slice(0, 10);
   const supa = supabaseAdmin();
 
+  // Apply admin template overrides (Settings → template editor) so edited templates take effect at creation
+  let effectiveTasks = tpl.tasks;
+  try {
+    const { data: ovRow } = await supa.from('app_settings').select('value').eq('key', 'template_overrides').single();
+    if (ovRow && ovRow.value) {
+      const overrides = JSON.parse(ovRow.value as string) as Record<string, { tasks?: typeof tpl.tasks }>;
+      const ovTasks = overrides[tpl.slug] && overrides[tpl.slug].tasks;
+      if (Array.isArray(ovTasks) && ovTasks.length > 0) effectiveTasks = ovTasks;
+    }
+  } catch { /* fall back to code template tasks */ }
+
   // 1. Insert project row
   const { data: proj, error: projErr } = await supa
     .from('projects')
@@ -63,7 +74,7 @@ export async function createProjectFromTemplate(input: NewProjectInput): Promise
   const startMs = new Date(start).getTime();
   const dayMs = 86_400_000;
 
-  const taskRows = tpl.tasks.map((t, i) => {
+  const taskRows = effectiveTasks.map((t, i) => {
     const due =
       t.dueOffsetDays !== undefined
         ? new Date(startMs + t.dueOffsetDays * dayMs).toISOString().slice(0, 10)
