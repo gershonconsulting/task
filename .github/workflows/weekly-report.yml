@@ -1,0 +1,17 @@
+name: Weekly Report
+
+# Sends the weekly project report every Monday at 10:00 UTC (5am EST / 6am EDT).
+# Requires a repository secret CRON_SECRET matching the CRON_SECRET env var on Cloudflare Pages.
+on:
+  schedule:
+    - cron: '0 10 * * 1'
+  workflow_dispatch: {}
+
+jobs:
+  send-weekly-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger weekly report endpoint
+        run: |
+          curl -fsS -X POST https://task.gershoncrm.com/api/cron/weekly-report \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
