@@ -3,7 +3,7 @@ export const runtime = 'edge'
 import { getCurrentUser } from '@/lib/currentUser'
 import AppShell from '@/components/AppShell'
 import { supabaseAdmin } from '@/lib/supabaseServer'
-import { TEMPLATES } from '@/lib/templates'
+import { TEMPLATES, MONTHLY_TEMPLATE_SLUGS } from '@/lib/templates'
 import { updateTaskStatusGlobal } from '@/lib/actions'
 import Link from 'next/link'
 
@@ -14,6 +14,17 @@ const ONBOARDING_SLUGS = [
   'lead-generation-onboarding',
   'social-selling-onboarding',
 ]
+
+const CATEGORY_ORDER = ['Onboarding', 'OnGoing', 'Closing', 'Others']
+
+function categoryOf(slug: string): string {
+  const s = (slug || '').toLowerCase()
+  if (s.includes('onboarding')) return 'Onboarding'
+  if (s.includes('end-of-project') || s.includes('closing')) return 'Closing'
+  const ongoing: readonly string[] = MONTHLY_TEMPLATE_SLUGS
+  if (ongoing.includes(s)) return 'OnGoing'
+  return 'Others'
+}
 
 function pctColor(pct: number) {
   if (pct === 100) return '#22c55e'
@@ -78,6 +89,14 @@ export default async function DashboardPage() {
 
   const tplMap = new Map(TEMPLATES.map(t => [t.slug, t]))
 
+  // Group projects into the 4 dashboard categories (order: Onboarding, OnGoing, Closing, Others)
+  const byCategory = new Map<string, typeof allProjects>()
+  for (const c of CATEGORY_ORDER) byCategory.set(c, [])
+  for (const p of allProjects) {
+    const c = categoryOf(p.template_slug)
+    byCategory.set(c, [...(byCategory.get(c) ?? []), p])
+  }
+
   // Overdue tasks
   const now = Date.now()
   const overdue = allTasks.filter(t => t.status !== 'completed' && t.due_date && new Date(t.due_date).getTime() < now)
@@ -125,75 +144,45 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* ── CLIENT CARDS ─────────────────────────────────────────────────── */}
-      <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Clients</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">
-        {clients.map(([email, clientProjects]) => {
-          const company = clientProjects[0]?.company_name ?? email
-          // Total progress across ALL client projects
-          const clientTasks = allTasks.filter(t => clientProjects.some(p => p.id === t.project_id))
-          const clientDone  = clientTasks.filter(t => t.status === 'completed').length
-          const clientPct   = clientTasks.length > 0 ? Math.round(clientDone / clientTasks.length * 100) : 0
-          const color       = pctColor(clientPct)
-
-          // Show onboarding projects for this client
-          const obProjects = clientProjects.filter(p => ONBOARDING_SLUGS.includes(p.template_slug))
-          // Other (monthly etc)
-          const otherCount = clientProjects.filter(p => !ONBOARDING_SLUGS.includes(p.template_slug)).length
-
+        {/* PROJECTS BY CATEGORY */}
+        {CATEGORY_ORDER.map(cat => {
+          const catProjects = byCategory.get(cat) ?? []
+          if (catProjects.length === 0) return null
+          const catTasks = allTasks.filter(t => catProjects.some(p => p.id === t.project_id))
+          const catDone = catTasks.filter(t => t.status === 'completed').length
+          const catPct = catTasks.length > 0 ? Math.round(catDone / catTasks.length * 100) : 0
           return (
-            <div key={email} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition">
-              {/* Card header with big % */}
-              <div className="p-5 flex items-center justify-between" style={{ borderBottom: '1px solid #f1f5f9' }}>
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-slate-900 text-base truncate">{company}</div>
-                  <div className="text-xs text-slate-400 truncate">{email}</div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
-                      <div className="h-2 rounded-full transition-all" style={{ width: clientPct + '%', backgroundColor: color }} />
-                    </div>
-                    <span className="text-xs font-medium text-slate-500">{clientDone}/{clientTasks.length}</span>
-                  </div>
-                </div>
-                {/* BIG % badge */}
-                <div className="ml-4 shrink-0 flex flex-col items-center">
-                  <div className="text-4xl font-black leading-none" style={{ color }}>{clientPct}</div>
-                  <div className="text-lg font-bold leading-none" style={{ color }}>%</div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">{otherCount > 0 ? otherCount + ' more' : ''}</div>
-                </div>
+            <div key={cat} className='mb-8'>
+              <div className='flex items-baseline justify-between mb-3'>
+                <h2 className='text-xs font-bold uppercase tracking-wider text-slate-400'>{cat} <span className='text-slate-300'>{catProjects.length}</span></h2>
+                <span className='text-xs font-medium' style={{ color: pctColor(catPct) }}>{catPct}% complete</span>
               </div>
-
-              {/* Onboarding project pills */}
-              {obProjects.length > 0 && (
-                <div className="px-4 py-3 space-y-2">
-                  {obProjects.map(p => {
-                    const tpl    = tplMap.get(p.template_slug)
-                    const counts = taskByProject.get(p.id) ?? { total: 0, done: 0, inprog: 0, tasks: [] }
-                    const pct    = counts.total > 0 ? Math.round(counts.done / counts.total * 100) : 0
-                    const pc     = pctColor(pct)
-                    return (
-                      <Link key={p.id} href={'/projects/' + p.id}
-                        className="flex items-center gap-3 group rounded-lg px-3 py-2 hover:bg-slate-50 border border-slate-100 transition">
-                        <span className="text-lg">{tpl?.icon ?? '📁'}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold text-slate-700 truncate group-hover:text-indigo-600">{tpl?.label ?? p.template_slug}</div>
-                          <div className="w-full bg-slate-100 rounded-full h-1 mt-1 overflow-hidden">
-                            <div className="h-1 rounded-full" style={{ width: pct + '%', backgroundColor: pc }} />
-                          </div>
+              <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'>
+                {catProjects.map(p => {
+                  const tpl = tplMap.get(p.template_slug)
+                  const counts = taskByProject.get(p.id) ?? { total: 0, done: 0, inprog: 0, tasks: [] }
+                  const pct = counts.total > 0 ? Math.round(counts.done / counts.total * 100) : 0
+                  const pc = pctColor(pct)
+                  return (
+                    <Link key={p.id} href={'/projects/' + p.id} className='block bg-white rounded-xl border border-slate-200 shadow-sm p-4 hover:shadow-md transition'>
+                      <div className='flex items-start justify-between gap-2'>
+                        <div className='min-w-0'>
+                          <div className='text-xs uppercase font-semibold text-slate-400 truncate'>{tpl?.icon} {tpl?.label ?? p.template_slug}</div>
+                          <div className='font-bold text-slate-900 truncate mt-0.5'>{p.company_name}</div>
                         </div>
-                        <div className="text-xl font-black shrink-0" style={{ color: pc }}>{pct}<span className="text-xs font-bold">%</span></div>
-                      </Link>
-                    )
-                  })}
-                </div>
-              )}
-              {obProjects.length === 0 && (
-                <div className="px-4 py-3 text-xs text-slate-400 italic">No onboarding project yet</div>
-              )}
+                        <div className='text-2xl font-black shrink-0' style={{ color: pc }}>{pct}<span className='text-xs font-bold'>%</span></div>
+                      </div>
+                      <div className='w-full bg-slate-100 rounded-full h-1.5 mt-3 overflow-hidden'>
+                        <div className='h-1.5 rounded-full' style={{ width: pct + '%', backgroundColor: pc }} />
+                      </div>
+                      <div className='text-xs text-slate-400 mt-2'>{counts.done}/{counts.total} tasks</div>
+                    </Link>
+                  )
+                })}
+              </div>
             </div>
           )
         })}
-      </div>
 
       {/* ── PENDING ONBOARDING TASKS (client tasks to assign) ────────────── */}
       {unassignedOnboardingTasks.length > 0 && (
