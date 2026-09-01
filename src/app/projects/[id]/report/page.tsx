@@ -2,9 +2,10 @@ export const runtime = 'edge'
 
 import { notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabaseServer'
-import { getTemplate } from '@/lib/templates'
+import { loadTemplateMap } from '@/lib/templates/runtime'
 
 export default async function ReportPage(props: { params: Promise<{ id: string }> }) {
+  const tplMap = await loadTemplateMap()
   const { id } = await props.params
   const supa = supabaseAdmin()
 
@@ -14,7 +15,7 @@ export default async function ReportPage(props: { params: Promise<{ id: string }
   const { data: tasks } = await supa.from('tasks').select('*').eq('project_id', id).order('position', { ascending: true })
   const taskRows = tasks ?? []
 
-  const tpl = getTemplate(project.template_slug)
+  const tpl = tplMap.get(project.template_slug)
   const total = taskRows.length
   const done = taskRows.filter((t: { status: string }) => t.status === 'completed').length
   const pct = total === 0 ? 0 : Math.round(done / total * 100)
