@@ -3,7 +3,8 @@ export const runtime = 'edge'
 import { notFound } from 'next/navigation'
 import { getCurrentUser } from '@/lib/currentUser'
 import { supabaseAdmin, type ProjectRow, type TaskRow } from '@/lib/supabaseServer'
-import { getTemplate, DEFAULT_TOOLS } from '@/lib/templates'
+import { DEFAULT_TOOLS } from '@/lib/templates'
+import { loadTemplateMap } from '@/lib/templates/runtime'
 import AppShell from '@/components/AppShell'
 import TaskList from './TaskList'
 import { deleteProject } from './actions'
@@ -12,6 +13,7 @@ import Link from 'next/link'
 const DEFAULT_TEAM = ['Olivier', 'Winnie Lauren', 'Aina Rama', 'Sai']
 
 export default async function ProjectDetailPage(props: { params: Promise<{ id: string }> }) {
+  const tplMap = await loadTemplateMap()
   const { id } = await props.params
   const user = await getCurrentUser()
 
@@ -38,7 +40,7 @@ export default async function ProjectDetailPage(props: { params: Promise<{ id: s
     }
   } catch { /* use defaults */ }
 
-  const tpl = getTemplate(p.template_slug)
+  const tpl = tplMap.get(p.template_slug)
   const total = taskRows.length
   const done = taskRows.filter(t => t.status === 'completed').length
   const pct = total === 0 ? 0 : Math.round((done / total) * 100)
