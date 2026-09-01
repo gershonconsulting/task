@@ -3,7 +3,7 @@ export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { supabaseAdmin } from '@/lib/supabaseServer'
-import { getTemplate } from '@/lib/templates'
+import { loadTemplateMap } from '@/lib/templates/runtime'
 
 // For now every email is delivered to the Resend account owner (oattia@gmail.com) until a sending
 // domain is verified in Resend; Olivier forwards to each member. Subjects name the intended member.
@@ -24,6 +24,7 @@ function pctColor(p: number): string { return p === 100 ? '#16a34a' : p >= 50 ? 
 function fmtDate(d: string | null): string { return d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'no date' }
 
 export async function POST(req: NextRequest) {
+  const tplMap = await loadTemplateMap()
   const secret = readEnv('CRON_SECRET')
   const auth = req.headers.get('authorization') || ''
   if (!secret || auth !== 'Bearer ' + secret) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
     const total = pt.length
     const done = pt.filter(t => t.status === 'completed').length
     const overdue = pt.filter(t => t.status !== 'completed' && t.due_date && t.due_date < today).length
-    return { name: p.company_name, service: getTemplate(p.template_slug)?.label ?? p.template_slug, total, done, pct: total ? Math.round(done / total * 100) : 0, overdue }
+    return { name: p.company_name, service: tplMap.get(p.template_slug)?.label ?? p.template_slug, total, done, pct: total ? Math.round(done / total * 100) : 0, overdue }
   }).sort((a, b) => a.name.localeCompare(b.name))
 
   const overallTotal = allTasks.length
