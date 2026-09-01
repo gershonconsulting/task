@@ -442,7 +442,7 @@ export default function TemplatesEditor() {
         <h2 className="text-base font-semibold text-slate-900 mb-1">Project Templates</h2>
         <p className="text-sm text-slate-500 mb-4">
           Edit default tasks, assignees, due-date offsets and tools for each template.
-         "Client" can be selected as assignee for tasks the client performs themselves.
+          "Client" can be selected as assignee for tasks the client performs themselves.
           Drag the <span className="font-mono">⠿</span> handle to reorder — this order is used here and in the new-project picker.
         </p>
         <div className="space-y-3">
@@ -543,7 +543,7 @@ export default function TemplatesEditor() {
                             value={tpl.projectType ?? 'advanced'}
                             onChange={e => updateMeta(tpl.slug, { projectType: e.target.value as ProjectType })}
                             className="flex-1 px-2 py-1.5 rounded border border-slate-200 text-xs bg-white capitalize"
-                            >
+                          >
                             {PROJECT_TYPES.map(p => <option key={p} value={p}>{p}</option>)}
                           </select>
                         </div>
