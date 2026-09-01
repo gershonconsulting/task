@@ -5,7 +5,7 @@ import { getIronSession } from 'iron-session'
 import { cookies } from 'next/headers'
 import { getSessionOptions, SessionData } from '@/lib/session'
 import { createProjectFromTemplate } from '@/lib/projectCreate'
-import { getTemplate } from '@/lib/templates'
+import { resolveTemplate } from '@/lib/templates/runtime'
 import type { ProjectType } from '@/lib/templates'
 import { supabaseAdmin } from '@/lib/supabaseServer'
 import { hashPassword } from '@/lib/password'
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   const pmRaw = (body.periodMonth ?? '').trim()
   const periodMonthDate = pmRaw ? (pmRaw.length === 7 ? pmRaw + '-01' : pmRaw) : undefined
 
-  if (!templateSlug || !getTemplate(templateSlug)) {
+  if (!templateSlug || !(await resolveTemplate(templateSlug))) {
     return NextResponse.json({ error: 'Pick a valid template.' }, { status: 400 })
   }
   if (!companyName) {
