@@ -22,13 +22,23 @@ interface TemplateTask {
   tool?: string
 }
 
+type ProjectType = 'simple' | 'advanced' | 'complex'
+
 interface ProcessTemplate {
   slug: string
   label: string
   icon: string
   color: string
   description: string
+  category?: string
+  projectType?: ProjectType
   tasks: TemplateTask[]
+}
+
+const PROJECT_TYPES: ProjectType[] = ['simple', 'advanced', 'complex']
+
+function slugify(s: string): string {
+  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 }
 
 const PRIORITIES: Priority[] = ['low', 'medium', 'high']
@@ -142,16 +152,133 @@ function ToolsEditor({ tools, onChange }: ToolsEditorProps) {
   )
 }
 
+interface NewTemplateFormProps {
+  categories: string[]
+  onCreate: (tpl: ProcessTemplate) => void
+}
+
+function NewTemplateForm({ categories, onCreate }: NewTemplateFormProps) {
+  const [open, setOpen] = useState(false)
+  const [label, setLabel] = useState('')
+  const [icon, setIcon] = useState('📁')
+  const [color, setColor] = useState('#6366f1')
+  const [category, setCategory] = useState('Custom')
+  const [description, setDescription] = useState('')
+  const [projectType, setProjectType] = useState<ProjectType>('advanced')
+
+  function reset() {
+    setLabel(''); setIcon('📁'); setColor('#6366f1')
+    setCategory('Custom'); setDescription(''); setProjectType('advanced')
+  }
+
+  function submit() {
+    const name = label.trim()
+    if (!name) return
+    const base = slugify(name) || 'template'
+    onCreate({
+      slug: base,
+      label: name,
+      icon: icon || '📁',
+      color,
+      description: description.trim(),
+      category: category.trim() || 'Custom',
+      projectType,
+      tasks: [{ id: base.substring(0, 3) + '-1', name: 'First task', assignedTo: null, priority: 'medium' }],
+    })
+    reset()
+    setOpen(false)
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="w-full py-3 rounded-lg border-2 border-dashed border-slate-300 text-sm font-semibold text-indigo-600 hover:border-indigo-400 hover:bg-indigo-50 transition"
+      >+ New template</button>
+    )
+  }
+
+  return (
+    <div className="bg-white rounded-lg border-2 border-indigo-300 shadow-sm p-5 space-y-3">
+      <h3 className="text-sm font-semibold text-slate-900">New template</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+        <input
+          autoFocus
+          value={label}
+          onChange={e => setLabel(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit() } }}
+          className="sm:col-span-2 px-3 py-2 rounded border border-slate-300 text-sm bg-white"
+          placeholder="Template name (e.g. Quarterly Review)"
+        />
+        <input
+          value={icon}
+          onChange={e => setIcon(e.target.value)}
+          className="px-3 py-2 rounded border border-slate-300 text-sm bg-white text-center"
+          placeholder="📁"
+          title="Emoji icon"
+          maxLength={4}
+        />
+        <div className="flex items-center gap-2">
+          <input
+            type="color"
+            value={color}
+            onChange={e => setColor(e.target.value)}
+            className="w-10 h-9 rounded cursor-pointer border border-slate-200"
+            title="Accent colour"
+          />
+          <select
+            value={projectType}
+            onChange={e => setProjectType(e.target.value as ProjectType)}
+            className="flex-1 px-2 py-2 rounded border border-slate-300 text-xs bg-white capitalize"
+            title="Project type"
+          >
+            {PROJECT_TYPES.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+        <input
+          value={category}
+          onChange={e => setCategory(e.target.value)}
+          list="template-categories"
+          className="px-3 py-2 rounded border border-slate-300 text-sm bg-white"
+          placeholder="Category"
+        />
+        <datalist id="template-categories">
+          {categories.map(c => <option key={c} value={c} />)}
+        </datalist>
+        <input
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+          className="sm:col-span-3 px-3 py-2 rounded border border-slate-300 text-sm bg-white"
+          placeholder="Short description (optional)"
+        />
+      </div>
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={submit} disabled={!label.trim()}
+          className="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white text-sm font-semibold">
+          Create template
+        </button>
+        <button type="button" onClick={() => { reset(); setOpen(false) }}
+          className="text-sm text-slate-500 hover:text-slate-700">Cancel</button>
+        <span className="text-xs text-slate-400">It starts with one task — add the rest below, then Save changes.</span>
+      </div>
+    </div>
+  )
+}
+
 export default function TemplatesEditor() {
   const [templates, setTemplates] = useState<ProcessTemplate[]>([])
   const [tools, setTools] = useState<Tool[]>([])
   const [overrides, setOverrides] = useState<Record<string, { tasks?: TemplateTask[] }>>({})
+  const [customTemplates, setCustomTemplates] = useState<ProcessTemplate[]>([])
   const [people, setPeople] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [openSlug, setOpenSlug] = useState<string | null>(null)
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const [overIdx, setOverIdx] = useState<number | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -160,6 +287,7 @@ export default function TemplatesEditor() {
     ]).then(([tplData, teamData]) => {
       setTemplates(tplData.templates)
       setOverrides(tplData.overrides ?? {})
+      setCustomTemplates(tplData.customTemplates ?? [])
       setTools(tplData.tools ?? [])
       const names = (teamData.members ?? []).map((m: { name: string }) => m.name).filter(Boolean)
       setPeople(names)
@@ -170,12 +298,59 @@ export default function TemplatesEditor() {
     })
   }, [])
 
+  const customSlugs = new Set(customTemplates.map(t => t.slug))
+
+  function isCustom(slug: string) { return customSlugs.has(slug) }
+
   function getEffectiveTasks(slug: string, baseTasks: TemplateTask[]): TemplateTask[] {
+    if (isCustom(slug)) return customTemplates.find(t => t.slug === slug)?.tasks ?? baseTasks
     return overrides[slug]?.tasks ?? baseTasks
   }
 
   function updateTasks(slug: string, tasks: TemplateTask[]) {
-    setOverrides(prev => ({ ...prev, [slug]: { ...prev[slug], tasks } }))
+    if (isCustom(slug)) {
+      setCustomTemplates(prev => prev.map(t => t.slug === slug ? { ...t, tasks } : t))
+    } else {
+      setOverrides(prev => ({ ...prev, [slug]: { ...prev[slug], tasks } }))
+    }
+    setSaved(false)
+  }
+
+  function createTemplate(tpl: ProcessTemplate) {
+    // guarantee a unique slug
+    let slug = tpl.slug
+    let n = 2
+    while (templates.some(t => t.slug === slug)) { slug = tpl.slug + '-' + n; n++ }
+    const created = { ...tpl, slug }
+    setCustomTemplates(prev => [...prev, created])
+    setTemplates(prev => [...prev, created])
+    setOpenSlug(slug)
+    setSaved(false)
+  }
+
+  function deleteTemplate(slug: string) {
+    if (!isCustom(slug)) return
+    if (!confirm('Delete this template? Projects already created from it keep their tasks.')) return
+    setCustomTemplates(prev => prev.filter(t => t.slug !== slug))
+    setTemplates(prev => prev.filter(t => t.slug !== slug))
+    if (openSlug === slug) setOpenSlug(null)
+    setSaved(false)
+  }
+
+  function updateMeta(slug: string, patch: Partial<ProcessTemplate>) {
+    setCustomTemplates(prev => prev.map(t => t.slug === slug ? { ...t, ...patch } : t))
+    setTemplates(prev => prev.map(t => t.slug === slug ? { ...t, ...patch } : t))
+    setSaved(false)
+  }
+
+  function reorder(from: number, to: number) {
+    if (from === to) return
+    setTemplates(prev => {
+      const next = [...prev]
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      return next
+    })
     setSaved(false)
   }
 
@@ -226,7 +401,12 @@ export default function TemplatesEditor() {
       const res = await fetch('/api/settings/templates', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ overrides, tools }),
+        body: JSON.stringify({
+          overrides,
+          tools,
+          customTemplates,
+          order: templates.map(t => t.slug),
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Save failed')
@@ -263,35 +443,112 @@ export default function TemplatesEditor() {
         <p className="text-sm text-slate-500 mb-4">
           Edit default tasks, assignees, due-date offsets and tools for each template.
           "Client" can be selected as assignee for tasks the client performs themselves.
+          Drag the <span className="font-mono">⠿</span> handle to reorder — this order is used here and in the new-project picker.
         </p>
         <div className="space-y-3">
-          {templates.map(tpl => {
+          {templates.map((tpl, tIdx) => {
             const isOpen = openSlug === tpl.slug
             const tasks = getEffectiveTasks(tpl.slug, tpl.tasks)
-            const isModified = !!overrides[tpl.slug]
+            const custom = isCustom(tpl.slug)
+            const isModified = !custom && !!overrides[tpl.slug]
+            const isDragTarget = overIdx === tIdx && dragIdx !== null && dragIdx !== tIdx
 
             return (
-              <div key={tpl.slug} className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setOpenSlug(isOpen ? null : tpl.slug)}
-                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{tpl.icon}</span>
-                    <div className="text-left">
-                      <div className="font-semibold text-slate-900 text-sm">
-                        {tpl.label}
-                        {isModified && <span className="ml-2 text-xs text-indigo-500 font-normal">(modified)</span>}
+              <div
+                key={tpl.slug}
+                onDragOver={e => { e.preventDefault(); setOverIdx(tIdx) }}
+                onDrop={e => {
+                  e.preventDefault()
+                  if (dragIdx !== null) reorder(dragIdx, tIdx)
+                  setDragIdx(null); setOverIdx(null)
+                }}
+                className={'bg-white rounded-lg border shadow-sm overflow-hidden transition '
+                  + (isDragTarget ? 'border-indigo-400 ring-2 ring-indigo-200 ' : 'border-slate-200 ')
+                  + (dragIdx === tIdx ? 'opacity-50' : '')}
+              >
+                <div className="w-full flex items-center gap-2 px-3 py-4 hover:bg-slate-50 transition">
+                  <span
+                    draggable
+                    onDragStart={() => setDragIdx(tIdx)}
+                    onDragEnd={() => { setDragIdx(null); setOverIdx(null) }}
+                    className="cursor-grab active:cursor-grabbing select-none px-1 text-slate-300 hover:text-slate-500 text-lg leading-none"
+                    title="Drag to reorder"
+                  >⠿</span>
+
+                  <button
+                    type="button"
+                    onClick={() => setOpenSlug(isOpen ? null : tpl.slug)}
+                    className="flex-1 flex items-center justify-between text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{tpl.icon}</span>
+                      <div className="text-left">
+                        <div className="font-semibold text-slate-900 text-sm">
+                          {tpl.label}
+                          {custom && <span className="ml-2 text-[10px] uppercase tracking-wider font-bold text-indigo-500">custom</span>}
+                          {isModified && <span className="ml-2 text-xs text-indigo-500 font-normal">(modified)</span>}
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          {tasks.length} tasks{tpl.category ? ' · ' + tpl.category : ''}
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-400">{tasks.length} tasks</div>
                     </div>
-                  </div>
-                  <span className="text-slate-400 text-xs">{isOpen ? '▲' : '▼'}</span>
-                </button>
+                    <span className="text-slate-400 text-xs pr-2">{isOpen ? '▲' : '▼'}</span>
+                  </button>
+
+                  {custom && (
+                    <button type="button" onClick={() => deleteTemplate(tpl.slug)}
+                      className="text-red-400 hover:text-red-600 text-xs font-bold px-2" title="Delete template">✕</button>
+                  )}
+                </div>
 
                 {isOpen && (
                   <div className="border-t border-slate-100 px-5 py-4 space-y-3">
+                    {custom && (
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 pb-2 border-b border-slate-100">
+                        <input
+                          value={tpl.label}
+                          onChange={e => updateMeta(tpl.slug, { label: e.target.value })}
+                          className="sm:col-span-2 px-2 py-1.5 rounded border border-slate-200 text-sm bg-white"
+                          placeholder="Template name"
+                        />
+                        <input
+                          value={tpl.icon}
+                          onChange={e => updateMeta(tpl.slug, { icon: e.target.value })}
+                          className="px-2 py-1.5 rounded border border-slate-200 text-sm bg-white text-center"
+                          maxLength={4}
+                          title="Emoji icon"
+                        />
+                        <input
+                          value={tpl.category ?? ''}
+                          onChange={e => updateMeta(tpl.slug, { category: e.target.value })}
+                          className="px-2 py-1.5 rounded border border-slate-200 text-sm bg-white"
+                          placeholder="Category"
+                        />
+                        <input
+                          value={tpl.description ?? ''}
+                          onChange={e => updateMeta(tpl.slug, { description: e.target.value })}
+                          className="sm:col-span-3 px-2 py-1.5 rounded border border-slate-200 text-sm bg-white"
+                          placeholder="Description"
+                        />
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={tpl.color}
+                            onChange={e => updateMeta(tpl.slug, { color: e.target.value })}
+                            className="w-9 h-8 rounded cursor-pointer border border-slate-200"
+                            title="Accent colour"
+                          />
+                          <select
+                            value={tpl.projectType ?? 'advanced'}
+                            onChange={e => updateMeta(tpl.slug, { projectType: e.target.value as ProjectType })}
+                            className="flex-1 px-2 py-1.5 rounded border border-slate-200 text-xs bg-white capitalize"
+                          >
+                            {PROJECT_TYPES.map(p => <option key={p} value={p}>{p}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    )}
                     {tasks.map((task, idx) => {
                       const taskTool = task.tool ? toolMap[task.tool] : null
                       return (
@@ -369,7 +626,7 @@ export default function TemplatesEditor() {
                     <div className="flex items-center gap-3 pt-1">
                       <button type="button" onClick={() => addTask(tpl.slug)}
                         className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">+ Add task</button>
-                      {isModified && (
+                      {isModified && !custom && (
                         <button type="button" onClick={() => resetTemplate(tpl.slug)}
                           className="text-xs text-slate-400 hover:text-slate-600">↺ Reset to default</button>
                       )}
@@ -379,6 +636,11 @@ export default function TemplatesEditor() {
               </div>
             )
           })}
+
+          <NewTemplateForm
+            categories={Array.from(new Set(templates.map(t => t.category).filter(Boolean) as string[]))}
+            onCreate={createTemplate}
+          />
         </div>
       </div>
 

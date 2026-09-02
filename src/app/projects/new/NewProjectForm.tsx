@@ -33,18 +33,17 @@ const CATEGORY_META: Record<string, { hint: string }> = {
   'People & Partners': { hint: 'Internal team & external partner onboarding.' },
   'Grants': { hint: 'Grant application and reporting.' },
 };
-const CATEGORY_ORDER = ['Setup & Lifecycle', 'Monthly Recurring', 'Onboarding', 'Billing', 'People & Partners', 'Grants'];
-
-function groupedTemplates(): { label: string; hint: string; items: ProcessTemplate[] }[] {
+// Categories are ordered by first appearance in the template list, so the manual
+// drag order set in Settings -> Project Templates drives this picker too.
+function groupedTemplates(list: ProcessTemplate[]): { label: string; hint: string; items: ProcessTemplate[] }[] {
   const grouped: Record<string, ProcessTemplate[]> = {};
-  for (const t of TEMPLATES) {
+  const order: string[] = [];
+  for (const t of list) {
     const cat = t.category ?? 'Other';
-    if (!grouped[cat]) grouped[cat] = [];
+    if (!grouped[cat]) { grouped[cat] = []; order.push(cat); }
     grouped[cat].push(t);
   }
-  return CATEGORY_ORDER
-    .filter(cat => grouped[cat]?.length)
-    .map(cat => ({ label: cat, hint: CATEGORY_META[cat]?.hint ?? '', items: grouped[cat] }));
+  return order.map(cat => ({ label: cat, hint: CATEGORY_META[cat]?.hint ?? '', items: grouped[cat] }));
 }
 
 interface ExistingClient { id: string; name: string; email: string }
@@ -70,13 +69,19 @@ export default function NewProjectForm() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successInfo, setSuccessInfo] = useState<{ projectId: string; tempPassword?: string } | null>(null);
+  // Code templates are the instant-render fallback; the API adds custom templates,
+  // admin task edits and the saved manual order.
+  const [templates, setTemplates] = useState<ProcessTemplate[]>(TEMPLATES);
 
-  const groups = groupedTemplates();
-  const selected = TEMPLATES.find(t => t.slug === templateSlug);
+  const groups = groupedTemplates(templates);
+  const selected = templates.find(t => t.slug === templateSlug);
 
   useEffect(() => {
     fetch('/api/clients').then(r => r.json()).then(data => {
       if (data.clients?.length) setExistingClients(data.clients);
+    }).catch(() => {});
+    fetch('/api/settings/templates').then(r => r.json()).then(data => {
+      if (Array.isArray(data.templates) && data.templates.length) setTemplates(data.templates);
     }).catch(() => {});
   }, []);
 

@@ -3,10 +3,11 @@ export const runtime = 'edge'
 import { getCurrentUser } from '@/lib/currentUser'
 import AppShell from '@/components/AppShell'
 import { supabaseAdmin } from '@/lib/supabaseServer'
-import { getTemplate } from '@/lib/templates'
+import { loadTemplateMap } from '@/lib/templates/runtime'
 import Link from 'next/link'
 
 export default async function ReportsPage() {
+  const tplMap = await loadTemplateMap()
   const user = await getCurrentUser()
   const supa = supabaseAdmin()
 
@@ -30,7 +31,7 @@ export default async function ReportsPage() {
       ) : (
         <div className="space-y-3">
           {allProjects.map(p => {
-            const tpl = getTemplate(p.template_slug)
+            const tpl = tplMap.get(p.template_slug)
             const pts = tasksByProject.get(p.id) ?? []
             const total = pts.length
             const done = pts.filter(t => t.status === 'completed').length

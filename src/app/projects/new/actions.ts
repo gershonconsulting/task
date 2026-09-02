@@ -7,7 +7,7 @@ import { cookies } from 'next/headers';
 import { getSessionOptions, type SessionData } from '@/lib/session';
 import { resolveTeamRole, canCreateProject } from '@/lib/roles';
 import { createProjectFromTemplate } from '@/lib/projectCreate';
-import { getTemplate } from '@/lib/templates';
+import { resolveTemplate } from '@/lib/templates/runtime';
 
 export interface CreateActionResult {
   ok: boolean;
@@ -37,7 +37,7 @@ export async function createProjectAction(
   const endDate           = String(formData.get('endDate')           ?? '').trim() || undefined;
 
   // 3. Validate
-  if (!templateSlug || !getTemplate(templateSlug)) return { ok: false, error: 'Pick a template.' };
+  if (!templateSlug || !(await resolveTemplate(templateSlug))) return { ok: false, error: 'Pick a template.' };
   if (!companyName)  return { ok: false, error: 'Project name is required.' };
   if (!clientEmail)  return { ok: false, error: 'Client email is required (used to match them at login).' };
   // LinkedIn URL stays optional — clients are matched by email at /login time

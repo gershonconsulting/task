@@ -2,7 +2,7 @@
 // Called server-side (edge runtime) from the new-project Server Action.
 
 import { supabaseAdmin } from './supabaseServer';
-import { getTemplate } from './templates';
+import { resolveTemplate } from './templates/runtime';
 import type { ProjectType } from './templates';
 
 export interface NewProjectInput {
@@ -27,22 +27,15 @@ export interface NewProjectResult {
 }
 
 export async function createProjectFromTemplate(input: NewProjectInput): Promise<NewProjectResult> {
-  const tpl = getTemplate(input.templateSlug);
+  // resolveTemplate covers code templates, admin-created custom templates, and
+  // applies any task overrides saved in Settings → Project Templates.
+  const tpl = await resolveTemplate(input.templateSlug);
   if (!tpl) throw new Error('Unknown template: ' + input.templateSlug);
 
   const start = input.startDate ?? new Date().toISOString().slice(0, 10);
   const supa = supabaseAdmin();
 
-  // Apply admin template overrides (Settings → template editor) so edited templates take effect at creation
-  let effectiveTasks = tpl.tasks;
-  try {
-    const { data: ovRow } = await supa.from('app_settings').select('value').eq('key', 'template_overrides').single();
-    if (ovRow && ovRow.value) {
-      const overrides = JSON.parse(ovRow.value as string) as Record<string, { tasks?: typeof tpl.tasks }>;
-      const ovTasks = overrides[tpl.slug] && overrides[tpl.slug].tasks;
-      if (Array.isArray(ovTasks) && ovTasks.length > 0) effectiveTasks = ovTasks;
-    }
-  } catch { /* fall back to code template tasks */ }
+  const effectiveTasks = tpl.tasks;
 
   // 1. Insert project row
   const { data: proj, error: projErr } = await supa

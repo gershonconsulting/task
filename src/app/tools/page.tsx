@@ -4,9 +4,11 @@ import { getCurrentUser } from '@/lib/currentUser'
 import AppShell from '@/components/AppShell'
 import { supabaseAdmin } from '@/lib/supabaseServer'
 import Link from 'next/link'
-import { DEFAULT_TOOLS, getTemplate } from '@/lib/templates'
+import { DEFAULT_TOOLS } from '@/lib/templates'
+import { loadTemplateMap } from '@/lib/templates/runtime'
 
 export default async function ToolsPage() {
+  const tplMap = await loadTemplateMap()
   const user = await getCurrentUser()
   const supa = supabaseAdmin()
 
@@ -97,7 +99,7 @@ export default async function ToolsPage() {
                 <div className="divide-y divide-slate-50">
                   {toolTasks.slice(0, 15).map(t => {
                     const proj = projectMap.get(t.project_id ?? '')
-                    const tpl = proj ? getTemplate(proj.template_slug) : undefined
+                    const tpl = proj ? tplMap.get(proj.template_slug) : undefined
                     return (
                       <div key={t.id} className="flex items-center gap-3 px-6 py-3 hover:bg-slate-50 transition">
                         <span className="flex-1 text-sm text-slate-800 truncate">{t.name}</span>

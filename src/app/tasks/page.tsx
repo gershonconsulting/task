@@ -5,7 +5,7 @@ import AppShell from '@/components/AppShell'
 import { supabaseAdmin } from '@/lib/supabaseServer'
 import { updateTaskStatusGlobal } from '@/lib/actions'
 import Link from 'next/link'
-import { getTemplate } from '@/lib/templates'
+import { loadTemplateMap } from '@/lib/templates/runtime'
 import StatusSelect from './StatusSelect'
 
 const DEFAULT_PROVIDERS = ['Winnie Lauren', 'Aina Rama', 'Olivier', 'Sai']
@@ -39,6 +39,7 @@ export default async function TasksPage({
   const user = await getCurrentUser()
   const { provider, status } = await searchParams
   const supa = supabaseAdmin()
+  const tplMap = await loadTemplateMap()
 
   const [tasksResult, projectsResult, teamSetting] = await Promise.all([
     supa.from('tasks').select('*'),
@@ -140,7 +141,7 @@ export default async function TasksPage({
               const st = t.status ?? 'pending'
               const nextSt = NEXT_STATUS[st] ?? 'pending'
               const proj = projectMap.get(t.project_id ?? '')
-              const tpl = proj ? getTemplate((proj as {template_slug:string}).template_slug) : undefined
+              const tpl = proj ? tplMap.get((proj as {template_slug:string}).template_slug) : undefined
               const overdue = t.due_date && t.due_date < today && st !== 'completed'
               return (
                 <div key={t.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition">
