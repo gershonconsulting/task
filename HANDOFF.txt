@@ -1,0 +1,97 @@
+================================================================
+HANDOFF.txt  -  task
+Written by: Claude (Anthropic) - token-limit handoff protocol
+Date: 2026-09-09
+================================================================
+
+0. WHO YOU ARE READING THIS
+----------------------------------------------------------------
+You are an AI assistant taking over work on this repository for
+Olivier Attia, founder / CTO of Gershon Consulting LLC.
+
+Read the MASTER HANDOFF first:
+  github.com/gershonconsulting/memory -> HANDOFF.txt
+
+CRITICAL OPERATING RULES - do not break these:
+  * Olivier does NOT use a terminal, CLI, git or PowerShell. NEVER
+    give him commands, scripts, .bat files or 'just run this' steps.
+  * He does NOT upload, download, move or save files, and does not
+    click buttons an AI injected. If a file has to get somewhere,
+    YOU find the route and execute it.
+  * End every actionable reply with:
+      GREEN CHECK = ready for him to test (+ the link)
+      RED CROSS   = something still to do (+ exactly 3 options he
+                    can actually action - never a CLI step)
+  * Executors: Ariel = code and repo work. Charles = Chrome extension
+    and web admin panels. BOTH ARE AI, NOT HUMANS.
+
+1. WHAT THIS REPO IS
+----------------------------------------------------------------
+Product   : Task (Gershon task/project platform)
+Live URL  : task.gershoncrm.com (verify)
+Does      : Client / project / stage / user tracking with process templates - one client, one column across every view
+Users     : Gershon Consulting internally
+
+2. STACK AND DEPLOY ROUTE
+----------------------------------------------------------------
+Framework     : Next.js (next.config.mjs, src/), TypeScript, Tailwind
+Database      : Supabase (supabase/ directory holds the schema)
+Hosting       : Cloudflare Pages via @cloudflare/next-on-pages
+                (wrangler.toml at root)
+Env           : copy .env.local.example - real values in 1Password
+Default branch: main
+Version       : 0.6.0
+CI            : .github/
+
+3. RECENTLY DONE  [DONE]
+----------------------------------------------------------------
+- v0.6.0 (2026-09-02).
+- PR #1 merged: client-column layout across ALL views - dashboard,
+  clients, projects, stages and users. One client, one column.
+  Folds in the templates work written 2026-08-15.
+  Verified with `tsc --noEmit`, `next build` AND
+  `@cloudflare/next-on-pages` before merge.
+- ProcessTemplate and NewTemplateForm gained projectType and category
+  fields; template creation updated to match.
+- New-project form: live templates + internal client.
+
+4. PENDING  [TODO]
+----------------------------------------------------------------
+- Nothing recorded as open at handoff time. This repo has been quiet
+  since 2026-09-02.
+- Confirm the live URL - task.gershoncrm.com is expected but was not
+  verified when this file was written.
+
+5. MISSING / NOT BUILT YET
+----------------------------------------------------------------
+- Confirm scope with Olivier before starting new work.
+
+6. KNOWN BUGS / NEEDS FIXING
+----------------------------------------------------------------
+- None recorded.
+
+7. NEXT ACTION - START HERE
+----------------------------------------------------------------
+  -> Confirm the app is actually live and reachable, then ask Olivier
+     what he wants next. Nothing is broken here as far as the record
+     shows.
+
+8. GOTCHAS / HARD-WON LESSONS
+----------------------------------------------------------------
+- THREE build checks before merging, not one: `tsc --noEmit`,
+  `next build`, and `@cloudflare/next-on-pages`. next-on-pages fails
+  on things next build accepts (edge-runtime incompatibilities), and
+  it is what actually runs in production. Skipping it ships a broken
+  deploy that built cleanly locally.
+- Writes to this repo go through the GitHub web UI in Chrome; `git
+  push` is proxy-refused and the API 403s on write. Verify every
+  commit by reading raw.githubusercontent.com.
+
+9. CONTACT / ESCALATION
+----------------------------------------------------------------
+Olivier Attia - oattia@gmail.com
+Report mailbox - report@gershonconsulting.com
+
+================================================================
+END OF HANDOFF
+================================================================
