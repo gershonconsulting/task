@@ -140,7 +140,7 @@ export default function NewProjectForm() {
             <p className="text-sm font-semibold text-amber-800 mb-1">Client login credentials</p>
             <p className="text-xs text-amber-700 mb-3">Share with client. They must change password on first login.</p>
             <div className="font-mono text-sm bg-white border border-amber-300 rounded-md p-3 space-y-1">
-              <div>URL: <strong>task.gershoncrm.com/login</strong> (Client tab)</div>
+              <div>URL: <strong>task.gershon.ai/login</strong> (Client tab)</div>
               <div>Password: <strong className="text-indigo-700 text-base">{successInfo.tempPassword}</strong></div>
             </div>
             <button type="button" onClick={() => navigator.clipboard.writeText(successInfo.tempPassword!)}

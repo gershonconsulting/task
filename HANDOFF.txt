@@ -28,7 +28,7 @@ CRITICAL OPERATING RULES - do not break these:
 1. WHAT THIS REPO IS
 ----------------------------------------------------------------
 Product   : Task (Gershon task/project platform)
-Live URL  : task.gershoncrm.com (moving to task.gershon.ai)
+Live URL  : task.gershon.ai (task.gershoncrm.com 308-redirects pages; its /api/* still answers)
 Does      : Client / project / stage / user tracking with process templates - one client, one column across every view
 Users     : Gershon Consulting internally
 
@@ -63,11 +63,11 @@ CI            : .github/
 
 4. PENDING  [TODO]
 ----------------------------------------------------------------
-- ❌ Attach task.gershon.ai: Cloudflare -> Workers & Pages -> gershon-task ->
+- ✅ (2026-10-13) Attach task.gershon.ai — done via attach-domain.yml (Pages domain) + DNS CNAME task -> gershon-task.pages.dev added in the dashboard. Old note: Cloudflare -> Workers & Pages -> gershon-task ->
   Custom domains -> add task.gershon.ai (dashboard froze for Claude; API route
   is not allowed). LinkedIn return URL for task.gershon.ai is ALREADY
   registered (Olivier, 2026-10-13).
-- ❌ Then flip NEW_DOMAIN_LIVE=true in src/lib/site.ts, change the two
+- ✅ (2026-10-13) Flipped NEW_DOMAIN_LIVE=true in src/lib/site.ts, change the two
   workflow URLs + deploy.yml NEXT_PUBLIC_SITE_URL + wrangler.toml to
   task.gershon.ai, push. Old host keeps /api/* and 308-redirects pages.
   Playbook: gershonconsulting/social docs/DOMAIN-MOVE-PLAYBOOK.md
@@ -86,7 +86,7 @@ CI            : .github/
 
 7. NEXT ACTION - START HERE
 ----------------------------------------------------------------
-  -> Check https://task.gershon.ai/login answers 200, then do the flip above.
+  -> Domain move done. Next: Olivier's first LinkedIn sign-in on task.gershon.ai.
 
 8. GOTCHAS / HARD-WON LESSONS
 ----------------------------------------------------------------

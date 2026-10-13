@@ -14,5 +14,5 @@ jobs:
     steps:
       - name: Trigger daily report endpoint
         run: |
-          curl -fsS -X POST https://task.gershoncrm.com/api/cron/daily-report \
+          curl -fsS -X POST https://task.gershon.ai/api/cron/daily-report \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

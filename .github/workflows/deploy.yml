@@ -38,7 +38,7 @@ jobs:
           LINKEDIN_CLIENT_SECRET: ${{ secrets.LINKEDIN_CLIENT_SECRET }}
         run: |
           printf '%s' "$SESSION_SECRET" | npx wrangler pages secret put SESSION_SECRET --project-name gershon-task
-          printf 'https://task.gershoncrm.com' | npx wrangler pages secret put NEXT_PUBLIC_SITE_URL --project-name gershon-task
+          printf 'https://task.gershon.ai' | npx wrangler pages secret put NEXT_PUBLIC_SITE_URL --project-name gershon-task
           printf '%s' "$SUPABASE_URL" | npx wrangler pages secret put SUPABASE_URL --project-name gershon-task
           printf '%s' "$SUPABASE_SERVICE_ROLE_KEY" | npx wrangler pages secret put SUPABASE_SERVICE_ROLE_KEY --project-name gershon-task
           printf '%s' "$ADMIN_PASSWORD" | npx wrangler pages secret put ADMIN_PASSWORD --project-name gershon-task

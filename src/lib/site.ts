@@ -18,7 +18,7 @@ import { getRequestContext } from '@cloudflare/next-on-pages'
  * is not attached to the Pages project yet). Flip to true only once
  * https://task.gershon.ai/login answers 200 — then the old host starts redirecting.
  */
-export const NEW_DOMAIN_LIVE = false
+export const NEW_DOMAIN_LIVE = true
 
 export const NEW_HOST = 'task.gershon.ai'
 export const OLD_HOST = 'task.gershoncrm.com'

@@ -28,7 +28,7 @@ jobs:
           ONLY: ${{ github.event.inputs.only }}
           MEMBER: ${{ github.event.inputs.member }}
         run: |
-          URL="https://task.gershoncrm.com/api/cron/weekly-report"
+          URL="https://task.gershon.ai/api/cron/weekly-report"
           if [ -n "$ONLY" ]; then URL="$URL?only=$(printf '%s' "$ONLY" | jq -sRr @uri)&member=$(printf '%s' "$MEMBER" | jq -sRr @uri)"; fi
           code=$(curl -sS -o /tmp/out.json -w '%{http_code}' -X POST "$URL" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
