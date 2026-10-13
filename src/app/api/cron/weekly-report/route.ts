@@ -61,7 +61,7 @@ function buildEmail(m: TeamMember, w: MyWork): { subject: string; html: string }
     <span style="font-size:18px;font-weight:800;color:#FE1B04;margin-left:10px;">Task</span><span style="font-size:12px;font-weight:600;color:#6e6e73;margin-left:6px;">by Gershon.AI</span>
   </div>
   <h1 style="font-size:22px;margin:0 0 4px;">${esc(first)}, here is your week</h1>
-  <p style="margin:0 0 16px;color:#6e6e73;font-size:13px;">Friday ${fmt(w.today)} · ${status}</p>
+  <p style="margin:0 0 16px;color:#6e6e73;font-size:13px;">Week ending ${fmt(w.today)} · ${status}</p>
   ${box(`Late (${late.length})`, taskRows(late, 'late'), late.length ? '#FE1B04' : '#e5e7eb')}
   ${box(`Due next week (${next.length})`, taskRows(next, 'next'))}
   ${box(`Done this week (${w.doneLast7.length})`, taskRows(w.doneLast7, 'done', 8), '#057642')}
