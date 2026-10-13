@@ -1,7 +1,7 @@
 ================================================================
 HANDOFF.txt  -  task
 Written by: Claude (Anthropic) - token-limit handoff protocol
-Date: 2026-09-09
+Date: 2026-09-09 (section 3-7 refreshed 2026-10-13, v1.0.0)
 ================================================================
 
 0. WHO YOU ARE READING THIS
@@ -28,7 +28,7 @@ CRITICAL OPERATING RULES - do not break these:
 1. WHAT THIS REPO IS
 ----------------------------------------------------------------
 Product   : Task (Gershon task/project platform)
-Live URL  : task.gershoncrm.com (verify)
+Live URL  : task.gershoncrm.com (moving to task.gershon.ai)
 Does      : Client / project / stage / user tracking with process templates - one client, one column across every view
 Users     : Gershon Consulting internally
 
@@ -43,38 +43,50 @@ Default branch: main
 Version       : 0.6.0
 CI            : .github/
 
-3. RECENTLY DONE  [DONE]
+3. RECENTLY DONE  [DONE]  — v1.0.0, 2026-10-13
 ----------------------------------------------------------------
-- v0.6.0 (2026-09-02).
-- PR #1 merged: client-column layout across ALL views - dashboard,
-  clients, projects, stages and users. One client, one column.
-  Folds in the templates work written 2026-08-15.
-  Verified with `tsc --noEmit`, `next build` AND
-  `@cloudflare/next-on-pages` before merge.
-- ProcessTemplate and NewTemplateForm gained projectType and category
-  fields; template creation updated to match.
-- New-project form: live templates + internal client.
+- Renamed "Task by Gershon.AI"; Linalysis layout in Gershon.ai red #FE1B04
+  (tailwind `brand` palette; `indigo` remapped to it). Sidebar/AppShell/
+  AppHeader/login rewritten.
+- LinkedIn sign-in (LinkedIn app 785duwvn6q6z80): /api/auth/linkedin/login,
+  /callback, /health. Only members of Settings -> Team members get in; first
+  sign-in binds their LinkedIn id. Middleware gates all pages + /api except
+  /login, /api/auth/*, /api/cron/*. Gate auto-disables if the LinkedIn
+  secret is missing (no lockout). Old pick-your-name login = 410.
+- Dashboard = "what I need to do": headline sentence, Late/Today/7 days/Done
+  KPIs, Do now + This week lists with one-click done, admin team table,
+  client board below. Code: src/lib/myWork.ts, src/components/MyTaskList.tsx.
+- Friday report: /api/cron/weekly-report, workflow "Friday Report"
+  (Fri 12:00 UTC). One e-mail per registered member, from
+  GC Task <reports@gershon.ai>, once per ET day. Test: run the workflow with
+  input only=<address>. Test sent to oattia@gmail.com 2026-10-13 (delivered).
 
 4. PENDING  [TODO]
 ----------------------------------------------------------------
-- Nothing recorded as open at handoff time. This repo has been quiet
-  since 2026-09-02.
-- Confirm the live URL - task.gershoncrm.com is expected but was not
-  verified when this file was written.
+- ❌ Attach task.gershon.ai: Cloudflare -> Workers & Pages -> gershon-task ->
+  Custom domains -> add task.gershon.ai (dashboard froze for Claude; API route
+  is not allowed). LinkedIn return URL for task.gershon.ai is ALREADY
+  registered (Olivier, 2026-10-13).
+- ❌ Then flip NEW_DOMAIN_LIVE=true in src/lib/site.ts, change the two
+  workflow URLs + deploy.yml NEXT_PUBLIC_SITE_URL + wrangler.toml to
+  task.gershon.ai, push. Old host keeps /api/* and 308-redirects pages.
+  Playbook: gershonconsulting/social docs/DOMAIN-MOVE-PLAYBOOK.md
+- ❌ Olivier's first real LinkedIn sign-in (verified up to LinkedIn's
+  password page).
 
 5. MISSING / NOT BUILT YET
 ----------------------------------------------------------------
-- Confirm scope with Olivier before starting new work.
+- assigned_to is free text; "Nicky" does not match Nicolette Jones, and
+  Johanna Tatafeno / Sai / Winnie Lauren have tasks but are not in Settings,
+  so they get no Friday report and cannot sign in.
 
 6. KNOWN BUGS / NEEDS FIXING
 ----------------------------------------------------------------
-- None recorded.
+- RLS still disabled on Supabase tables (service-role access only).
 
 7. NEXT ACTION - START HERE
 ----------------------------------------------------------------
-  -> Confirm the app is actually live and reachable, then ask Olivier
-     what he wants next. Nothing is broken here as far as the record
-     shows.
+  -> Check https://task.gershon.ai/login answers 200, then do the flip above.
 
 8. GOTCHAS / HARD-WON LESSONS
 ----------------------------------------------------------------
