@@ -1,0 +1,50 @@
+name: Attach task.gershon.ai
+
+# Approved by Olivier 2026-10-13 ("go Cloudflare API"). Re-runnable.
+# Attaches task.gershon.ai to the Cloudflare Pages project gershon-task and makes
+# sure the DNS record exists in the gershon.ai zone. Uses the deploy's
+# CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID. task.gershoncrm.com is never touched.
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths: ['.github/workflows/attach-domain.yml']
+
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PROJECT: gershon-task
+      DOMAIN: task.gershon.ai
+      ZONE: gershon.ai
+    steps:
+      - name: Attach the custom domain to the Pages project
+        run: |
+          api() { curl -sS -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" "$@"; }
+          echo "--- current domains"
+          api "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/pages/projects/$PROJECT/domains" | jq -c '{success, domains: [.result[]? | {name, status}], errors}'
+          echo "--- add $DOMAIN"
+          api -X POST "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/pages/projects/$PROJECT/domains" -d "{\"name\":\"$DOMAIN\"}" | jq -c '{success, status: .result.status?, errors}'
+      - name: Make sure the DNS record exists
+        run: |
+          api() { curl -sS -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" "$@"; }
+          ZID=$(api "https://api.cloudflare.com/client/v4/zones?name=$ZONE" | jq -r '.result[0].id // empty')
+          if [ -z "$ZID" ]; then echo "::warning::token cannot see zone $ZONE — DNS record must be added in the dashboard"; exit 0; fi
+          EXIST=$(api "https://api.cloudflare.com/client/v4/zones/$ZID/dns_records?name=$DOMAIN" | jq -r '.result[0].id // empty')
+          if [ -n "$EXIST" ]; then
+            echo "record exists"; api "https://api.cloudflare.com/client/v4/zones/$ZID/dns_records/$EXIST" | jq -c '.result | {type,name,content,proxied}'
+          else
+            api -X POST "https://api.cloudflare.com/client/v4/zones/$ZID/dns_records" \
+              -d "{\"type\":\"CNAME\",\"name\":\"task\",\"content\":\"$PROJECT.pages.dev\",\"proxied\":true,\"comment\":\"Task by Gershon.AI (Pages $PROJECT)\"}" | jq -c '{success, errors}'
+          fi
+      - name: Wait for the domain to go active
+        run: |
+          for i in $(seq 1 20); do
+            S=$(curl -sS -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/pages/projects/$PROJECT/domains/$DOMAIN" | jq -r '.result.status')
+            echo "try $i: $S"
+            [ "$S" = "active" ] && break
+            sleep 15
+          done
+          curl -s -o /dev/null -w "https://$DOMAIN/login -> %{http_code}\n" "https://$DOMAIN/login" || true
