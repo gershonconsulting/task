@@ -4,3 +4,10 @@ node_modules/
 .env
 *.log
 .DS_Store
+
+# local build output
+.vercel/
+.wrangler/
+next-env.d.ts
+package-lock.json
+tsconfig.tsbuildinfo
