@@ -1,17 +1,21 @@
-name: Weekly Report
+name: Friday Report
 
-# Sends the weekly project report every Monday at 10:00 UTC (5am EST / 6am EDT).
-# Requires a repository secret CRON_SECRET matching the CRON_SECRET env var on Cloudflare Pages.
+# Every Friday at 12:00 UTC (08:00 ET) each member registered in Task
+# (Settings → Team members) receives their own weekly report by e-mail.
+# The endpoint sends once per New-York day, so a retry cannot double-send.
+# Run it on demand from Actions → Friday Report → Run workflow.
 on:
   schedule:
-    - cron: '0 10 * * 1'
+    - cron: '0 12 * * 5'
   workflow_dispatch: {}
 
 jobs:
-  send-weekly-report:
+  send-friday-report:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger weekly report endpoint
+      - name: Trigger Friday report endpoint
         run: |
-          curl -fsS -X POST https://task.gershoncrm.com/api/cron/weekly-report \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+          code=$(curl -sS -o /tmp/out.json -w '%{http_code}' -X POST https://task.gershoncrm.com/api/cron/weekly-report \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          echo "HTTP $code"; cat /tmp/out.json; echo
+          test "$code" = "200"

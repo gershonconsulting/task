@@ -1,6 +1,6 @@
 {
-  "name": "task-gershoncrm",
-  "version": "0.6.0",
+  "name": "task-gershon-ai",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",

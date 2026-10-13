@@ -34,12 +34,18 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          LINKEDIN_CLIENT_ID: ${{ secrets.LINKEDIN_CLIENT_ID }}
+          LINKEDIN_CLIENT_SECRET: ${{ secrets.LINKEDIN_CLIENT_SECRET }}
         run: |
           printf '%s' "$SESSION_SECRET" | npx wrangler pages secret put SESSION_SECRET --project-name gershon-task
           printf 'https://task.gershoncrm.com' | npx wrangler pages secret put NEXT_PUBLIC_SITE_URL --project-name gershon-task
           printf '%s' "$SUPABASE_URL" | npx wrangler pages secret put SUPABASE_URL --project-name gershon-task
           printf '%s' "$SUPABASE_SERVICE_ROLE_KEY" | npx wrangler pages secret put SUPABASE_SERVICE_ROLE_KEY --project-name gershon-task
           printf '%s' "$ADMIN_PASSWORD" | npx wrangler pages secret put ADMIN_PASSWORD --project-name gershon-task
+          # LinkedIn sign-in (v1.0.0). Only pushed when the GitHub secret exists, so an
+          # empty value never overwrites a secret already set on Cloudflare Pages.
+          if [ -n "$LINKEDIN_CLIENT_ID" ]; then printf '%s' "$LINKEDIN_CLIENT_ID" | npx wrangler pages secret put LINKEDIN_CLIENT_ID --project-name gershon-task; fi
+          if [ -n "$LINKEDIN_CLIENT_SECRET" ]; then printf '%s' "$LINKEDIN_CLIENT_SECRET" | npx wrangler pages secret put LINKEDIN_CLIENT_SECRET --project-name gershon-task; else echo "::warning::LINKEDIN_CLIENT_SECRET GitHub secret is empty — LinkedIn sign-in relies on the value already on Cloudflare Pages"; fi
 
       - name: Deploy to Cloudflare Pages
         run: npx wrangler pages deploy .vercel/output/static --project-name gershon-task --commit-dirty=true

@@ -1,160 +1,125 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import pkg from '../../../package.json'
 
-interface TeamMember {
-  id: string
-  name: string
-  email: string
-  role: 'admin' | 'team'
+const ERRORS: Record<string, string> = {
+  not_registered: 'This LinkedIn account is not on the Gershon Consulting team list. Ask an admin to add your LinkedIn profile in Settings → Team members.',
+  linkedin_cancelled: 'LinkedIn sign-in was cancelled.',
+  state: 'The sign-in took too long or was opened in another tab. Please try again.',
+  token: 'LinkedIn refused the sign-in. Please try again.',
+  userinfo: 'LinkedIn did not return your profile. Please try again.',
+  not_configured: 'LinkedIn sign-in is not configured on the server yet.',
 }
 
-const DEFAULT_USERS: TeamMember[] = [
-  { id: 'olivier', name: 'Olivier Attia', email: 'olivier@gershonconsulting.com', role: 'admin' },
-  { id: 'winnie', name: 'Winnie Lauren', email: 'winnie.lauren@gershonconsulting.com', role: 'team' },
-  { id: 'aina', name: 'Aina Rama', email: 'aina.rama@gershonconsulting.com', role: 'team' },
-  { id: 'sai', name: 'Sai', email: 'sai@gershonconsulting.com', role: 'team' },
-]
+function LinkedInLogo() {
+  return (
+    <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
+      <rect width="24" height="24" rx="4" fill="#fff" />
+      <path fill="#0a66c2" d="M6.94 8.5H4.3V19h2.64zM5.62 4.5a1.53 1.53 0 1 0 0 3.06 1.53 1.53 0 0 0 0-3.06zM19.7 13.1c0-2.83-1.5-4.15-3.52-4.15a3.04 3.04 0 0 0-2.75 1.51V8.5h-2.53V19h2.64v-5.2c0-1.37.26-2.7 1.96-2.7 1.67 0 1.7 1.57 1.7 2.79V19h2.5z" />
+    </svg>
+  )
+}
 
-export default function LoginPage() {
-  const [tab, setTab] = useState<'team' | 'client'>('team')
-  const [loading, setLoading] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [users, setUsers] = useState<TeamMember[]>(DEFAULT_USERS)
-  const [clientEmail, setClientEmail] = useState('')
-  const [clientPassword, setClientPassword] = useState('')
-  const [clientLoading, setClientLoading] = useState(false)
+function LoginInner() {
+  const sp = useSearchParams()
+  const err = sp.get('error')
+  const detail = sp.get('detail')
+  const next = sp.get('next') || '/dashboard'
+  const signedOut = sp.get('signed_out')
+  const [showClient, setShowClient] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [clientError, setClientError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetch('/api/settings/team')
-      .then(r => r.json())
-      .then(data => { if (data.members?.length) setUsers(data.members) })
-      .catch(() => {})
-  }, [])
-
-  async function pickTeamMember(user: TeamMember) {
-    setLoading(user.id)
-    setError(null)
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ person: user.id }),
-      })
-      if (res.ok) {
-        window.location.href = '/projects'
-      } else {
-        const d = await res.json()
-        setError(d.error ?? 'Something went wrong.')
-      }
-    } catch {
-      setError('Network error.')
-    } finally {
-      setLoading(null)
-    }
-  }
-
-  async function handleClientLogin(e: React.FormEvent) {
+  async function clientLogin(e: React.FormEvent) {
     e.preventDefault()
-    setError(null)
-    setClientLoading(true)
+    setBusy(true); setClientError(null)
     try {
       const res = await fetch('/api/auth/client-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: clientEmail, password: clientPassword }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       })
       const data = await res.json()
-      if (res.ok && data.ok) {
-        window.location.href = '/client'
-      } else {
-        setError(data.error ?? 'Invalid email or password.')
-      }
-    } catch {
-      setError('Network error.')
-    } finally {
-      setClientLoading(false)
-    }
+      if (res.ok && data.ok) window.location.href = '/client'
+      else setClientError(data.error ?? 'Invalid email or password.')
+    } catch { setClientError('Network error.') } finally { setBusy(false) }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex flex-col items-center justify-center px-6 py-12">
-      <p className="text-xs uppercase tracking-[0.2em] text-indigo-600 font-bold mb-2">Gershon Consulting</p>
-      <h1 className="text-3xl font-light text-slate-900 mb-1">Task Manager</h1>
-      <p className="text-sm text-slate-500 mb-8">Sign in to continue</p>
-
-      <div className="flex gap-1 bg-slate-100 rounded-lg p-1 mb-8 w-full max-w-xs">
-        <button
-          onClick={() => { setTab('team'); setError(null) }}
-          className={`flex-1 py-2 text-sm font-semibold rounded-md transition ${tab === 'team' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-          Team
-        </button>
-        <button
-          onClick={() => { setTab('client'); setError(null) }}
-          className={`flex-1 py-2 text-sm font-semibold rounded-md transition ${tab === 'client' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-          Client
-        </button>
+    <div className="min-h-screen grid md:grid-cols-2 bg-[#fafafa]">
+      {/* brand panel */}
+      <div className="hidden md:flex flex-col justify-between bg-brand-600 text-white p-12">
+        <div className="flex items-center gap-3">
+          <svg viewBox="0 0 64 64" width="36" height="36"><rect width="64" height="64" rx="14" fill="#fff" /><path d="M18 33l9 9 19-20" fill="none" stroke="#FE1B04" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <span className="text-2xl font-extrabold tracking-tight">Task <span className="font-semibold opacity-80">by Gershon.AI</span></span>
+        </div>
+        <div>
+          <h2 className="text-4xl font-extrabold tracking-tight leading-tight">Know exactly what<br />you have to do today.</h2>
+          <p className="mt-4 text-white/85 max-w-md">Every client, every project, every task of the Gershon Consulting team — with what is late and what is next at the top.</p>
+        </div>
+        <p className="text-xs text-white/70">gershon.ai</p>
       </div>
 
-      {tab === 'team' ? (
-        <div className="flex flex-col gap-4 w-full max-w-xs">
-          {users.map(u => (
-            <button
-              key={u.id}
-              onClick={() => pickTeamMember(u)}
-              disabled={loading !== null}
-              className="flex items-center gap-4 bg-white border border-slate-200 rounded-lg px-5 py-4 shadow-sm hover:shadow-md hover:border-indigo-400 transition disabled:opacity-50 text-left"
-            >
-              <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-lg flex-shrink-0">
-                {u.name[0]}
-              </div>
-              <div>
-                <div className="font-semibold text-slate-900 text-sm">
-                  {loading === u.id ? 'Signing in…' : u.name}
-                </div>
-                <div className="text-xs text-slate-500 capitalize">{u.role}</div>
-              </div>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <form onSubmit={handleClientLogin} className="w-full max-w-xs space-y-3">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Email</label>
-            <input
-              type="email"
-              value={clientEmail}
-              onChange={e => setClientEmail(e.target.value)}
-              required
-              placeholder="you@company.com"
-              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:border-indigo-500"
-            />
+      {/* sign-in */}
+      <div className="flex flex-col items-center justify-center px-6 py-12">
+        <div className="w-full max-w-sm">
+          <div className="md:hidden flex items-center gap-2.5 mb-8">
+            <svg viewBox="0 0 64 64" width="32" height="32"><rect width="64" height="64" rx="14" fill="#FE1B04" /><path d="M18 33l9 9 19-20" fill="none" stroke="#fff" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <span className="text-xl font-extrabold text-brand-600">Task <span className="text-[#6e6e73] font-semibold text-base">by Gershon.AI</span></span>
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Password</label>
-            <input
-              type="password"
-              value={clientPassword}
-              onChange={e => setClientPassword(e.target.value)}
-              required
-              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:border-indigo-500"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={clientLoading}
-            className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white text-sm font-semibold transition"
-          >
-            {clientLoading ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
-      )}
+          <h1 className="text-2xl font-bold tracking-tight">Sign in</h1>
+          <p className="text-sm text-[#6e6e73] mt-1 mb-7">Gershon Consulting team — use your LinkedIn account.</p>
 
-      {error && <p className="mt-6 text-sm text-red-600 text-center">{error}</p>}
-      <p className="mt-10 text-xs text-slate-400">v{pkg.version}</p>
+          {signedOut && !err && (
+            <div className="mb-5 text-sm rounded-lg border border-[#e5e7eb] bg-white px-4 py-3 text-[#6e6e73]">You are signed out.</div>
+          )}
+          {err && (
+            <div className="mb-5 text-sm rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-brand-800">
+              {ERRORS[err] ?? 'Sign-in failed. Please try again.'}
+              {err === 'not_registered' && detail && <div className="mt-1 text-xs opacity-80">LinkedIn account: {detail}</div>}
+            </div>
+          )}
+
+          <a
+            href={'/api/auth/linkedin/login?next=' + encodeURIComponent(next)}
+            className="w-full inline-flex items-center justify-center gap-3 rounded-lg bg-[#0a66c2] hover:bg-[#004182] text-white font-semibold text-[15px] py-3 shadow-sm transition-colors"
+          >
+            <LinkedInLogo /> Sign in with LinkedIn
+          </a>
+          <p className="text-xs text-[#6e6e73] mt-3 leading-relaxed">
+            Only people listed in <strong>Settings → Team members</strong> with their LinkedIn profile can enter.
+          </p>
+
+          <div className="mt-10 pt-6 border-t border-[#e5e7eb]">
+            {!showClient ? (
+              <button onClick={() => setShowClient(true)} className="text-xs font-semibold text-[#6e6e73] hover:text-brand-600">
+                Client of Gershon Consulting? Sign in with your client access →
+              </button>
+            ) : (
+              <form onSubmit={clientLogin} className="space-y-3">
+                <div className="text-sm font-semibold">Client access</div>
+                <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com"
+                  className="w-full px-3 py-2.5 rounded-lg border border-[#e5e7eb] bg-white text-sm focus:outline-none focus:border-brand-600" />
+                <input type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="Password"
+                  className="w-full px-3 py-2.5 rounded-lg border border-[#e5e7eb] bg-white text-sm focus:outline-none focus:border-brand-600" />
+                <button type="submit" disabled={busy}
+                  className="w-full py-2.5 rounded-lg bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white text-sm font-semibold">
+                  {busy ? 'Signing in…' : 'Sign in'}
+                </button>
+                {clientError && <p className="text-sm text-brand-700">{clientError}</p>}
+              </form>
+            )}
+          </div>
+          <p className="mt-10 text-[11px] text-[#6e6e73]">Task by Gershon.AI · v{pkg.version}</p>
+        </div>
+      </div>
     </div>
   )
+}
+
+export default function LoginPage() {
+  return <Suspense><LoginInner /></Suspense>
 }

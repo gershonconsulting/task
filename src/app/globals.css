@@ -1,3 +1,15 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Gershon.AI unified look — mirrors Linalysis common.css */
+:root {
+  --brand: #FE1B04;
+  --brand-dark: #d11200;
+  --brand-light: #fff5f5;
+  --text: #1d1d1f;
+  --text-muted: #6e6e73;
+  --border: #e5e7eb;
+  --bg: #fafafa;
+}
+html, body { background: var(--bg); color: var(--text); font-size: 14px; -webkit-font-smoothing: antialiased; }

@@ -4,18 +4,19 @@ import { NextResponse } from 'next/server'
 import { getIronSession } from 'iron-session'
 import { cookies } from 'next/headers'
 import { getSessionOptions, SessionData } from '@/lib/session'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { siteUrl } from '@/lib/site'
 
-function getSiteUrl(): string {
-      try {
-              return (getRequestContext().env as Record<string, string>).NEXT_PUBLIC_SITE_URL ?? '/'
-      } catch {
-              return process.env.NEXT_PUBLIC_SITE_URL ?? '/'
-      }
+async function signOut() {
+  const session = await getIronSession<SessionData>(await cookies(), getSessionOptions())
+  session.destroy()
 }
 
 export async function GET() {
-      const session = await getIronSession<SessionData>(await cookies(), getSessionOptions())
-      session.destroy()
-      return NextResponse.redirect(getSiteUrl())
+  await signOut()
+  return NextResponse.redirect(`${siteUrl()}/login?signed_out=1`)
+}
+
+export async function POST() {
+  await signOut()
+  return NextResponse.json({ ok: true })
 }

@@ -7,6 +7,10 @@ interface TeamMember {
   name: string
   email: string
   linkedin?: string
+  linkedinEmail?: string
+  linkedinLinked?: boolean
+  lastLogin?: string
+  unlink?: boolean
   role: 'admin' | 'team'
 }
 
@@ -91,10 +95,26 @@ export default function TeamEditor() {
           <input
             value={m.linkedin ?? ''}
             onChange={e => update(idx, { linkedin: e.target.value })}
-            placeholder='LinkedIn URL'
+            placeholder='LinkedIn profile URL (used to sign in)'
             type='url'
             className='flex-[2] min-w-[160px] px-2 py-1.5 rounded border border-slate-200 text-sm bg-white focus:outline-none focus:border-indigo-400'
           />
+          <input
+            value={m.linkedinEmail ?? ''}
+            onChange={e => update(idx, { linkedinEmail: e.target.value })}
+            placeholder='LinkedIn login email (if different)'
+            type='email'
+            className='flex-[2] min-w-[160px] px-2 py-1.5 rounded border border-slate-200 text-sm bg-white focus:outline-none focus:border-indigo-400'
+          />
+          <span
+            title={m.linkedinLinked ? 'Signed in with LinkedIn' + (m.lastLogin ? ' — last ' + new Date(m.lastLogin).toLocaleDateString() : '') : 'Has not signed in with LinkedIn yet'}
+            className={`text-[11px] font-semibold px-2 py-1 rounded-full ${m.linkedinLinked && !m.unlink ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}
+          >
+            {m.linkedinLinked && !m.unlink ? 'in LinkedIn ✓' : 'not signed in yet'}
+          </span>
+          {m.linkedinLinked && !m.unlink && (
+            <button type='button' onClick={() => update(idx, { unlink: true })} className='text-[11px] text-slate-400 hover:text-red-600 underline' title='Forget the LinkedIn account bound to this member'>unlink</button>
+          )}
           <select
             value={m.role}
             onChange={e => update(idx, { role: e.target.value as 'admin' | 'team' })}
