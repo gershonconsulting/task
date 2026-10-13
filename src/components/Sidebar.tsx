@@ -30,14 +30,14 @@ const I = {
 
 const TEAM_NAV: Group[] = [
   { items: [
-    { href: '/dashboard', label: 'My Dashboard', icon: I.dash },
-    { href: '/tasks', label: 'All Tasks', icon: I.check },
+    { href: '/dashboard', label: 'Dashboard', icon: I.dash },
+    { href: '/tasks', label: 'Tasks', icon: I.check },
   ] },
-  { label: 'Views', items: [
+  { label: 'Boards', items: [
     { href: '/clients', label: 'By Client', icon: I.building },
     { href: '/projects', label: 'By Project', icon: I.folder },
     { href: '/stages', label: 'By Stage', icon: I.layers },
-    { href: '/users', label: 'By Provider', icon: I.users },
+    { href: '/users', label: 'By Person', icon: I.users },
     { href: '/tools', label: 'By Tool', icon: I.tool },
   ] },
   { label: 'Reports', items: [

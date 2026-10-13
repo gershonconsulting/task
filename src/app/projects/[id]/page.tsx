@@ -44,6 +44,11 @@ export default async function ProjectDetailPage(props: { params: Promise<{ id: s
   const total = taskRows.length
   const done = taskRows.filter(t => t.status === 'completed').length
   const pct = total === 0 ? 0 : Math.round((done / total) * 100)
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+  const openTasks = taskRows.filter(t => t.status !== 'completed').sort((a, b) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999'))
+  const late = openTasks.filter(t => t.due_date && t.due_date < today).length
+  const next = openTasks[0]
+  const nice = (d: string) => new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
 
   return (
     <AppShell
@@ -53,45 +58,48 @@ export default async function ProjectDetailPage(props: { params: Promise<{ id: s
       pageSubtitle={''+( tpl?.icon ?? '') + ' ' + (tpl?.label ?? p.template_slug) + ' · ' + p.status.replace('_', ' ')}
     >
       <div className="mb-4 flex items-center gap-4">
-        <Link href="/projects" className="text-sm text-slate-500 hover:text-slate-700">← Projects</Link>
-        <Link href={'/projects/' + id + '/report'} className="ml-auto text-sm text-indigo-600 hover:text-indigo-800">Status report →</Link>
+        <Link href="/projects" className="text-sm text-[#6e6e73] hover:text-brand-600">← Projects</Link>
+        <Link href={'/projects/' + id + '/report'} className="ml-auto text-sm font-semibold text-brand-600 hover:underline">Status report →</Link>
       </div>
 
-      <section className="bg-white rounded-lg border border-slate-200 shadow-sm p-5 mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div>
-          <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Progress</div>
-          <div className="text-3xl font-light text-slate-900 mt-1">{pct}%</div>
-          <div className="text-xs text-slate-500 mt-1">{done}/{total} tasks done</div>
-          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden mt-2">
-            <div className="h-2 rounded-full" style={{ width: pct + '%', backgroundColor: tpl?.color ?? '#6366f1' }} />
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 mb-6">
+        <div className="bg-white border border-[#e5e7eb] rounded-xl px-5 py-4">
+          <div className="text-[11.5px] font-semibold uppercase tracking-[0.05em] text-[#6e6e73]">Progress</div>
+          <div className="text-[28px] font-extrabold tracking-tight mt-1">{pct}%</div>
+          <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden mt-1"><div className="h-1.5 rounded-full bg-brand-600" style={{ width: pct + '%' }} /></div>
+          <div className="text-[11px] text-[#6e6e73] mt-1.5">{done} of {total} tasks done</div>
+        </div>
+        <div className="bg-white border border-[#e5e7eb] rounded-xl px-5 py-4">
+          <div className="text-[11.5px] font-semibold uppercase tracking-[0.05em] text-[#6e6e73]">Late</div>
+          <div className={'text-[28px] font-extrabold tracking-tight mt-1 ' + (late ? 'text-brand-600' : '')}>{late}</div>
+          <div className="text-[11px] text-[#6e6e73]">{late ? 'tasks past their due date' : 'nothing late'}</div>
+        </div>
+        <div className="bg-white border border-[#e5e7eb] rounded-xl px-5 py-4 col-span-2">
+          <div className="text-[11.5px] font-semibold uppercase tracking-[0.05em] text-[#6e6e73]">Next step</div>
+          {next ? (
+            <>
+              <div className="text-[15px] font-semibold mt-1.5 truncate">{next.name}</div>
+              <div className="text-[12px] text-[#6e6e73] mt-0.5">{next.assigned_to ?? 'nobody assigned'}{next.due_date ? ' · due ' + nice(next.due_date) : ''}</div>
+            </>
+          ) : <div className="text-[15px] font-semibold mt-1.5 text-[#057642]">All done ✓</div>}
+          <div className="text-[11px] text-[#6e6e73] mt-2 truncate">
+            {[p.client_first_name, p.client_last_name].filter(Boolean).join(' ') || 'Contact'} · {p.client_email} · started {p.start_date ? nice(p.start_date) : '—'}
           </div>
-        </div>
-        <div>
-          <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Contact</div>
-          <div className="text-sm text-slate-900 mt-1">{[p.client_first_name, p.client_last_name].filter(Boolean).join(' ') || '—'}</div>
-          {p.client_title && <div className="text-xs text-slate-500">{p.client_title}</div>}
-          <div className="text-xs text-slate-500 mt-1 truncate">{p.client_email}</div>
-        </div>
-        <div>
-          <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Timeline</div>
-          <div className="text-sm text-slate-900 mt-1">{p.start_date ?? '—'}</div>
-          <div className="text-xs text-slate-500">to {p.end_date ?? '—'}</div>
-        </div>
-        <div>
-          <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Created by</div>
-          <div className="text-sm text-slate-900 mt-1 truncate">{p.created_by_email}</div>
-          <div className="text-xs text-slate-500">{new Date(p.created_at).toLocaleDateString()}</div>
         </div>
       </section>
 
       <TaskList projectId={p.id} tasks={taskRows} canEditMeta={true} canDelete={true} tools={tools} team={team} />
 
-      <form action={deleteProject} className="mt-10 border-t border-red-100 pt-5">
-        <input type="hidden" name="projectId" value={p.id} />
-        <button type="submit" formAction={deleteProject} className="text-xs text-red-600 hover:text-red-800 underline">
-          Delete this project (cannot be undone)
-        </button>
-      </form>
+      <details className="mt-10 border-t border-[#e5e7eb] pt-4">
+        <summary className="cursor-pointer text-xs text-[#6e6e73] hover:text-red-700">Delete this project…</summary>
+        <form action={deleteProject} className="mt-3 flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+          <input type="hidden" name="projectId" value={p.id} />
+          <span className="text-xs text-red-800">This removes the project and all its tasks. It cannot be undone.</span>
+          <button type="submit" formAction={deleteProject} className="ml-auto text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-md px-3 py-1.5">
+            Yes, delete it
+          </button>
+        </form>
+      </details>
     </AppShell>
   )
 }

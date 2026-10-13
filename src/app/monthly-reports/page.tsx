@@ -4,6 +4,8 @@ import AppShell from '@/components/AppShell'
 import { supabaseAdmin } from '@/lib/supabaseServer'
 import { MONTHLY_TEMPLATES, MONTHLY_TEMPLATE_SLUGS } from '@/lib/templates'
 import Link from 'next/link'
+import { cleanClient } from '@/lib/myWork'
+import { INTERNAL_EMAIL } from '@/lib/clientBoard'
 const MONTHS_BACK = 6
 function monthLabel(y:number,m:number){return new Date(y,m-1,1).toLocaleString('en-US',{month:'short',year:'numeric'})}
 function monthKey(y:number,m:number){return y+'-'+String(m).padStart(2,'0')}
@@ -16,8 +18,9 @@ function generateMonths(n:number){
   }
   return months.reverse()
 }
-export default async function MonthlyReportsPage(){
+export default async function MonthlyReportsPage({searchParams}:{searchParams:Promise<{generated?:string;month?:string;errors?:string}>}){
   const user=await getCurrentUser()
+  const sp=await searchParams
   const supa=supabaseAdmin()
   const months=generateMonths(MONTHS_BACK)
   const now=new Date()
@@ -33,7 +36,7 @@ export default async function MonthlyReportsPage(){
     tByP.set(t.project_id,c2)
   }
   const cMap=new Map()
-  for(const p of ap??[])if(p.client_email&&!cMap.has(p.client_email))cMap.set(p.client_email,p.company_name??p.client_email)
+  for(const p of ap??[])if(p.client_email&&p.client_email!==INTERNAL_EMAIL&&!cMap.has(p.client_email))cMap.set(p.client_email,cleanClient(p.company_name??p.client_email))
   const clients=Array.from(cMap.entries()).sort((a,b)=>a[1].localeCompare(b[1]))
   const idxByT=new Map()
   for(const tmpl of MONTHLY_TEMPLATES){
@@ -44,10 +47,16 @@ export default async function MonthlyReportsPage(){
   }
   return(
     <AppShell userName={user.name} userRole={user.role} pageTitle="Monthly Projects" pageSubtitle="Auto-created on the 1st of every month for all clients">
+      {sp.generated!==undefined&&(
+        <div className={`mb-5 rounded-xl border px-4 py-3 text-sm ${sp.errors?'bg-brand-50 border-brand-200 text-brand-800':'bg-green-50 border-green-200 text-green-800'}`}>
+          {Number(sp.generated)>0?`Created ${sp.generated} monthly project${sp.generated==='1'?'':'s'} for ${sp.month}.`:`Nothing new to create for ${sp.month} — every client already has its monthly projects.`}
+          {sp.errors?` ${sp.errors} could not be created.`:''}
+        </div>
+      )}
       <div className="flex items-center justify-between mb-8">
         <p className="text-sm text-slate-500">Showing last {MONTHS_BACK} months &middot; {clients.length} clients</p>
         <form method="POST" action="/api/cron/monthly-reports">
-          <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg">⚡ Generate {monthLabel(now.getFullYear(),now.getMonth()+1)}</button>
+          <button type="submit" className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-lg">⚡ Generate {monthLabel(now.getFullYear(),now.getMonth()+1)}</button>
         </form>
       </div>
       {clients.length===0?(

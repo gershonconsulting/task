@@ -3,169 +3,156 @@ export const runtime = 'edge'
 import { getCurrentUser } from '@/lib/currentUser'
 import AppShell from '@/components/AppShell'
 import { supabaseAdmin } from '@/lib/supabaseServer'
-import { updateTaskStatusGlobal } from '@/lib/actions'
 import Link from 'next/link'
 import { loadTemplateMap } from '@/lib/templates/runtime'
+import { isAssignedTo, loadTeam } from '@/lib/team'
+import { addDays, cleanClient, etToday } from '@/lib/myWork'
 import StatusSelect from './StatusSelect'
 
-const DEFAULT_PROVIDERS = ['Winnie Lauren', 'Aina Rama', 'Olivier', 'Sai']
+type T = {
+  id: string; name: string; status: string | null; assigned_to: string | null
+  due_date: string | null; priority: string | null; project_id: string | null; updated_at: string
+}
 
-const NEXT_STATUS: Record<string, string> = {
-  pending: 'in_progress',
-  in_progress: 'completed',
-  completed: 'pending',
-}
-const STATUS_LABEL: Record<string, string> = {
-  pending: 'Pending',
-  in_progress: 'In progress',
-  completed: 'Done',
-}
-const STATUS_STYLE: Record<string, string> = {
-  pending: 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200',
-  in_progress: 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200',
-  completed: 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200',
-}
-const PRIORITY_DOT: Record<string, string> = {
-  high: 'bg-red-400',
-  medium: 'bg-amber-400',
-  low: 'bg-slate-300',
+function niceDate(d: string) {
+  return new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
 }
 
 export default async function TasksPage({
   searchParams,
 }: {
-  searchParams: Promise<{ provider?: string; status?: string }>
+  searchParams: Promise<{ who?: string; provider?: string; status?: string; q?: string }>
 }) {
   const user = await getCurrentUser()
-  const { provider, status } = await searchParams
+  const sp = await searchParams
   const supa = supabaseAdmin()
-  const tplMap = await loadTemplateMap()
-
-  const [tasksResult, projectsResult, teamSetting] = await Promise.all([
-    supa.from('tasks').select('*'),
-    supa.from('projects').select('id, company_name, client_email, template_slug'),
-    supa.from('app_settings').select('value').eq('key', 'team_members').single(),
+  const [tplMap, team, tasksRes, projRes] = await Promise.all([
+    loadTemplateMap(),
+    loadTeam(),
+    supa.from('tasks').select('id, name, status, assigned_to, due_date, priority, project_id, updated_at'),
+    supa.from('projects').select('id, company_name, template_slug, status'),
   ])
+  const projects = new Map(((projRes.data ?? []) as { id: string; company_name: string; template_slug: string; status: string }[])
+    .filter(p => p.status !== 'archived').map(p => [p.id, p]))
+  const all = ((tasksRes.data ?? []) as T[]).filter(t => t.project_id && projects.has(t.project_id))
 
-  let providers = DEFAULT_PROVIDERS
-  try {
-    if (teamSetting.data?.value) {
-      const members = JSON.parse(teamSetting.data.value) as { name: string }[]
-      const names = members.map(m => m.name).filter(Boolean)
-      if (names.length > 0) providers = names
-    }
-  } catch { /* use defaults */ }
+  // Filters — default: my open tasks.
+  const me = team.find(m => m.id === user.id) ?? team.find(m => m.email === user.email)
+  const legacyProvider = sp.provider ? team.find(m => m.name === sp.provider)?.id : undefined
+  const who = sp.who ?? legacyProvider ?? 'me'
+  const status = sp.status ?? 'open'
+  const q = (sp.q ?? '').trim().toLowerCase()
 
-  const allTasks = (tasksResult.data ?? []) as Array<{
-    id: string; name: string; status: string | null; assigned_to: string | null;
-    due_date: string | null; priority: string | null; tool?: string | null; project_id: string | null;
-  }>
-  const projectMap = new Map((projectsResult.data ?? []).map((p: {id:string; company_name:string; client_email:string; template_slug:string}) => [p.id, p]))
-
-  let filtered = allTasks
-  if (provider && provider !== 'all') filtered = filtered.filter(t => t.assigned_to === provider)
-  if (status && status !== 'all') filtered = filtered.filter(t => t.status === status)
-
-  const STATUS_ORDER: Record<string, number> = { pending: 0, in_progress: 1, completed: 2 }
-  filtered = filtered.slice().sort((a, b) => {
-    const sA = STATUS_ORDER[a.status ?? 'pending'] ?? 0
-    const sB = STATUS_ORDER[b.status ?? 'pending'] ?? 0
-    if (sA !== sB) return sA - sB
-    return (a.due_date ?? '').localeCompare(b.due_date ?? '')
+  let rows = all
+  if (who === 'me') rows = rows.filter(t => isAssignedTo(me ?? { name: user.name, email: user.email }, t.assigned_to))
+  else if (who === 'unassigned') rows = rows.filter(t => !t.assigned_to)
+  else if (who !== 'all') { const m = team.find(x => x.id === who); if (m) rows = rows.filter(t => isAssignedTo(m, t.assigned_to)) }
+  if (q) rows = rows.filter(t => {
+    const p = projects.get(t.project_id!)!
+    return (t.name + ' ' + p.company_name + ' ' + (t.assigned_to ?? '')).toLowerCase().includes(q)
   })
+  const open = rows.filter(t => t.status !== 'completed')
+  const done = rows.filter(t => t.status === 'completed').sort((a, b) => b.updated_at.localeCompare(a.updated_at))
 
-  const activeProvider = provider ?? 'all'
-  const activeStatus = status ?? 'all'
+  const today = etToday(), week = addDays(today, 7)
+  const byDue = (a: T, b: T) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999')
+  const groups = [
+    { id: 'late', title: 'Late', tone: 'text-brand-600', items: open.filter(t => t.due_date && t.due_date < today).sort(byDue) },
+    { id: 'today', title: 'Due today', tone: 'text-amber-700', items: open.filter(t => t.due_date === today) },
+    { id: 'week', title: 'Next 7 days', tone: 'text-[#1d1d1f]', items: open.filter(t => t.due_date && t.due_date > today && t.due_date <= week).sort(byDue) },
+    { id: 'later', title: 'Later', tone: 'text-[#1d1d1f]', items: open.filter(t => t.due_date && t.due_date > week).sort(byDue) },
+    { id: 'nodate', title: 'No due date', tone: 'text-[#6e6e73]', items: open.filter(t => !t.due_date) },
+  ].filter(g => g.items.length)
 
-  function filterLink(p?: string, s?: string) {
-    const params = new URLSearchParams()
-    if (p && p !== 'all') params.set('provider', p)
-    if (s && s !== 'all') params.set('status', s)
-    const qs = params.toString()
-    return '/tasks' + (qs ? '?' + qs : '')
+  const link = (patch: Record<string, string>) => {
+    const p = new URLSearchParams({ who, status, ...(q ? { q } : {}), ...patch })
+    if (p.get('who') === 'me') p.delete('who')
+    if (p.get('status') === 'open') p.delete('status')
+    if (!p.get('q')) p.delete('q')
+    const s = p.toString()
+    return '/tasks' + (s ? '?' + s : '')
+  }
+  const chip = (active: boolean) =>
+    `px-3 py-1.5 rounded-full text-[13px] font-medium border transition ${active ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-[#1d1d1f] border-[#e5e7eb] hover:border-brand-600 hover:text-brand-600'}`
+
+  const whoChips = [
+    { id: 'me', label: 'Me' },
+    { id: 'all', label: 'Everyone' },
+    ...team.filter(m => m.id !== me?.id).map(m => ({ id: m.id, label: m.name.split(' ')[0] })),
+    { id: 'unassigned', label: 'Nobody assigned' },
+  ]
+  const whoLabel = whoChips.find(c => c.id === who)?.label ?? 'Everyone'
+
+  const Row = ({ t }: { t: T }) => {
+    const p = projects.get(t.project_id!)!
+    const tpl = tplMap.get(p.template_slug)
+    const st = t.status ?? 'pending'
+    const late = st !== 'completed' && t.due_date && t.due_date < today
+    const daysLate = late ? Math.round((new Date(today + 'T12:00:00Z').getTime() - new Date(t.due_date + 'T12:00:00Z').getTime()) / 86400000) : 0
+    return (
+      <li className="flex items-center gap-3 py-2.5">
+        <StatusSelect taskId={t.id} projectId={t.project_id ?? ''} status={st} />
+        <div className="flex-1 min-w-0">
+          <div className={`text-[14px] truncate ${st === 'completed' ? 'text-[#6e6e73] line-through decoration-slate-300' : 'font-medium'}`}>
+            {t.priority === 'high' && st !== 'completed' && <span className="mr-1.5 text-[10px] font-bold uppercase text-brand-700 bg-brand-50 border border-brand-100 rounded px-1.5 py-0.5 align-middle">high</span>}
+            {t.name}
+          </div>
+          <Link href={'/projects/' + p.id} className="text-[12px] text-[#6e6e73] hover:text-brand-600 truncate block">
+            {cleanClient(p.company_name)} · {tpl?.icon} {tpl?.label ?? p.template_slug}
+          </Link>
+        </div>
+        <span className={`text-[12px] shrink-0 w-28 truncate text-right hidden sm:block ${t.assigned_to ? 'text-[#6e6e73]' : 'text-brand-600 font-semibold'}`}>
+          {t.assigned_to ?? 'nobody'}
+        </span>
+        <span className={`text-[12px] shrink-0 w-28 text-right ${late ? 'text-brand-600 font-semibold' : t.due_date === today ? 'text-amber-700 font-semibold' : 'text-[#6e6e73]'}`}>
+          {!t.due_date ? '—' : late ? `${daysLate}d late` : t.due_date === today ? 'today' : niceDate(t.due_date)}
+        </span>
+      </li>
+    )
   }
 
-  const today = new Date().toISOString().slice(0, 10)
-  const totalCount = filtered.length
-  const doneCount = filtered.filter(t => t.status === 'completed').length
-  const openCount = filtered.filter(t => t.status !== 'completed').length
-
   return (
-    <AppShell userName={user.name} userRole={user.role} pageTitle="Tasks" pageSubtitle="All tasks — click status badge to update">
+    <AppShell userName={user.name} userRole={user.role} pageTitle="Tasks"
+      pageSubtitle={`${whoLabel === 'Me' ? 'My' : whoLabel === 'Everyone' ? 'Everyone’s' : whoLabel + '’s'} ${status === 'done' ? 'finished' : status === 'all' ? '' : 'open'} tasks — most urgent first`}>
 
-      {/* Provider filter */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider mr-1">Provider:</span>
-        {['all', ...providers].map(p => (
-          <Link key={p} href={filterLink(p, activeStatus)}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium border transition ${
-              activeProvider === p
-                ? 'bg-indigo-600 text-white border-indigo-600'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
-            }`}>
-            {p === 'all' ? 'Everyone' : p.split(' ')[0]}
-          </Link>
-        ))}
-      </div>
-
-      {/* Status filter */}
-      <div className="flex flex-wrap items-center gap-2 mb-6">
-        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider mr-1">Status:</span>
-        {[{key:'all',label:'All'},{key:'pending',label:'Pending'},{key:'in_progress',label:'In progress'},{key:'completed',label:'Done'}].map(s => (
-          <Link key={s.key} href={filterLink(activeProvider, s.key)}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium border transition ${
-              activeStatus === s.key
-                ? 'bg-indigo-600 text-white border-indigo-600'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
-            }`}>
-            {s.label}
-          </Link>
-        ))}
-      </div>
-
-      {/* Summary */}
-      <div className="flex items-center gap-4 mb-4 text-sm text-slate-500">
-        <span><span className="font-semibold text-slate-800">{totalCount}</span> tasks</span>
-        <span><span className="font-semibold text-green-600">{doneCount}</span> done</span>
-        <span><span className="font-semibold text-indigo-600">{openCount}</span> open</span>
-      </div>
-
-      {filtered.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-lg border border-dashed border-slate-200">
-          <p className="text-slate-400">No tasks match the current filters.</p>
+      <div className="bg-white border border-[#e5e7eb] rounded-xl p-4 mb-5 space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#6e6e73] w-14">Who</span>
+          {whoChips.map(c => <Link key={c.id} href={link({ who: c.id })} className={chip(who === c.id)}>{c.label}</Link>)}
         </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="divide-y divide-slate-50">
-            {filtered.map(t => {
-              const st = t.status ?? 'pending'
-              const nextSt = NEXT_STATUS[st] ?? 'pending'
-              const proj = projectMap.get(t.project_id ?? '')
-              const tpl = proj ? tplMap.get((proj as {template_slug:string}).template_slug) : undefined
-              const overdue = t.due_date && t.due_date < today && st !== 'completed'
-              return (
-                <div key={t.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition">
-                  <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${PRIORITY_DOT[t.priority ?? 'medium'] ?? 'bg-slate-300'}`} />
-                  <StatusSelect taskId={t.id} projectId={t.project_id ?? ''} status={st} />
-                  <span className="flex-1 min-w-0 flex items-center gap-2"><span className="text-sm text-slate-800 truncate">{t.name}</span>{proj && (<Link href={"/projects/" + (proj as {id:string}).id} className="text-xs text-slate-400 hover:text-indigo-600 shrink-0 inline-flex items-center gap-1"><span>{tpl?.icon ?? '📁'}</span><span className="truncate max-w-[160px]">{(proj as {company_name:string}).company_name}</span></Link>)}</span>
-                  {t.tool && (
-                    <span className="text-xs bg-violet-50 text-violet-600 px-2 py-0.5 rounded-full border border-violet-200 shrink-0 hidden sm:inline">
-                      {t.tool}
-                    </span>
-                  )}
-                  <span className="text-xs text-slate-400 shrink-0 hidden md:block w-24 truncate text-right">
-                    {t.assigned_to ? t.assigned_to.split(' ')[0] : '—'}
-                  </span>
-                  {t.due_date && (
-                    <span className={`text-xs shrink-0 hidden lg:block ${overdue ? 'text-red-500 font-medium' : 'text-slate-400'}`}>
-                      {overdue ? '⚠ ' : ''}{new Date(t.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </span>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-[#6e6e73] w-14">Show</span>
+          {[{ k: 'open', l: 'To do' }, { k: 'done', l: 'Done' }, { k: 'all', l: 'All' }].map(s =>
+            <Link key={s.k} href={link({ status: s.k })} className={chip(status === s.k)}>{s.l}</Link>)}
+          <form action="/tasks" className="ml-auto flex items-center gap-2">
+            {who !== 'me' && <input type="hidden" name="who" value={who} />}
+            {status !== 'open' && <input type="hidden" name="status" value={status} />}
+            <input name="q" defaultValue={sp.q ?? ''} placeholder="Search a task or client…"
+              className="w-64 max-w-full px-3 py-1.5 rounded-lg border border-[#e5e7eb] text-[13px] focus:outline-none focus:border-brand-600" />
+          </form>
         </div>
+      </div>
+
+      <div className="flex items-center gap-4 mb-3 text-[13px] text-[#6e6e73]">
+        <span><strong className="text-[#1d1d1f]">{open.length}</strong> to do</span>
+        {groups[0]?.id === 'late' && <span><strong className="text-brand-600">{groups[0].items.length}</strong> late</span>}
+        <span><strong className="text-[#057642]">{done.length}</strong> done</span>
+      </div>
+
+      {status !== 'done' && (groups.length === 0
+        ? <div className="bg-white border border-[#e5e7eb] rounded-xl px-5 py-8 text-center text-[#6e6e73]">Nothing to do here. ✓</div>
+        : groups.map(g => (
+          <section key={g.id} className="bg-white border border-[#e5e7eb] rounded-xl px-5 pt-4 pb-2 mb-4">
+            <h3 className={`text-[13px] font-extrabold uppercase tracking-[0.06em] ${g.tone}`}>{g.title} <span className="text-[#6e6e73] font-semibold">({g.items.length})</span></h3>
+            <ul className="divide-y divide-[#f0f0f2]">{g.items.map(t => <Row key={t.id} t={t} />)}</ul>
+          </section>
+        )))}
+
+      {status !== 'open' && done.length > 0 && (
+        <section className="bg-white border border-[#e5e7eb] rounded-xl px-5 pt-4 pb-2 mb-4">
+          <h3 className="text-[13px] font-extrabold uppercase tracking-[0.06em] text-[#057642]">Done <span className="text-[#6e6e73] font-semibold">({done.length})</span></h3>
+          <ul className="divide-y divide-[#f0f0f2]">{done.slice(0, 200).map(t => <Row key={t.id} t={t} />)}</ul>
+        </section>
       )}
     </AppShell>
   )

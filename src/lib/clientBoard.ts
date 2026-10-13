@@ -33,6 +33,8 @@ export interface BoardProject {
   pct: number;
   status: ProjStatus;
   providers: ProviderShare[];
+  /** The open task to do next: earliest due date first. */
+  next: { name: string; who: string | null; due: string | null; daysLate: number } | null;
 }
 
 export interface BoardClient {
@@ -88,13 +90,20 @@ export function projectStatus(p: { total: number; done: number; overdue: number;
 
 /**
  * Clients carry polluted company_name values ("Flying Secoya - Social Content
- * Creation onboarding"), so the display name is the shortest company_name in
- * the group — the one without a service suffix tacked on.
+ * Creation onboarding", or just "Flexidesktop" — the service, not the client).
+ * Strip " - suffix", drop names that are only a template/service label, then
+ * take the most common name (shortest on a tie).
  */
-function cleanClientName(names: string[]): string {
-  const usable = names.filter(Boolean);
-  if (usable.length === 0) return 'Unknown client';
-  return usable.reduce((best, n) => (n.length < best.length ? n : best), usable[0]);
+function cleanClientName(names: string[], serviceLabels: Set<string>): string {
+  const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const cleaned = names.filter(Boolean)
+    .map(n => n.split(/\s[-–—|]\s/)[0].trim())
+    .filter(n => n && !serviceLabels.has(norm(n)));
+  const pool = cleaned.length ? cleaned : names.filter(Boolean);
+  if (pool.length === 0) return 'Unknown client';
+  const count = new Map<string, number>();
+  for (const n of pool) count.set(n, (count.get(n) ?? 0) + 1);
+  return [...count.entries()].sort((a, b) => b[1] - a[1] || a[0].length - b[0].length)[0][0];
 }
 
 export async function loadBoardData(): Promise<BoardData> {
@@ -105,20 +114,21 @@ export async function loadBoardData(): Promise<BoardData> {
       .select('id, company_name, client_email, template_slug, start_date, created_at')
       .order('created_at', { ascending: false }),
     supa.from('tasks')
-      .select('id, project_id, status, assigned_to, due_date'),
+      .select('id, project_id, name, status, assigned_to, due_date, position'),
     loadTemplateMap(),
   ]);
 
   const allProjects = projects ?? [];
   const allTasks = tasks ?? [];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
   interface Acc {
     total: number; done: number; inProgress: number; overdue: number;
     nextDue: string | null; providers: Map<string, ProviderShare>;
+    next: { name: string; who: string | null; due: string | null; pos: number } | null;
   }
   const acc = new Map<string, Acc>();
-  const blank = (): Acc => ({ total: 0, done: 0, inProgress: 0, overdue: 0, nextDue: null, providers: new Map() });
+  const blank = (): Acc => ({ total: 0, done: 0, inProgress: 0, overdue: 0, nextDue: null, providers: new Map(), next: null });
 
   for (const t of allTasks) {
     const pid = t.project_id as string | null;
@@ -134,6 +144,13 @@ export async function loadBoardData(): Promise<BoardData> {
     if (late) a.overdue++;
     if (!done && t.due_date && (a.nextDue === null || (t.due_date as string) < a.nextDue)) {
       a.nextDue = t.due_date as string;
+    }
+    if (!done) {
+      const due = (t.due_date as string | null) ?? null;
+      const pos = (t.position as number | null) ?? 0;
+      const k = (due ?? '9999') + String(pos).padStart(4, '0');
+      const cur = a.next ? (a.next.due ?? '9999') + String(a.next.pos).padStart(4, '0') : null;
+      if (cur === null || k < cur) a.next = { name: t.name as string, who: (t.assigned_to as string | null) ?? null, due, pos };
     }
 
     const who = (t.assigned_to as string | null) || 'Unassigned';
@@ -168,6 +185,11 @@ export async function loadBoardData(): Promise<BoardData> {
       pct: a.total > 0 ? Math.round((a.done / a.total) * 100) : 0,
       status: projectStatus(base),
       providers: [...a.providers.values()].sort((x, y) => y.total - x.total),
+      next: a.next ? {
+        name: a.next.name, who: a.next.who, due: a.next.due,
+        daysLate: a.next.due && a.next.due < today
+          ? Math.round((new Date(today + 'T12:00:00Z').getTime() - new Date(a.next.due + 'T12:00:00Z').getTime()) / 86400000) : 0,
+      } : null,
     };
 
     const key = (p.client_email as string | null) || NO_CLIENT;
@@ -176,6 +198,10 @@ export async function loadBoardData(): Promise<BoardData> {
     namesByClient.get(key)!.push(proj.companyName);
   }
 
+  const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const serviceLabels = new Set<string>();
+  for (const t of tplMap.values()) { serviceLabels.add(norm(t.label)); serviceLabels.add(norm(t.slug)); }
+  for (const w of ['closing', 'onboarding', 'endofproject']) serviceLabels.add(w);
   const clients: BoardClient[] = [...byClient.entries()].map(([key, projs]) => {
     const total = projs.reduce((n, p) => n + p.total, 0);
     const done = projs.reduce((n, p) => n + p.done, 0);
@@ -183,7 +209,9 @@ export async function loadBoardData(): Promise<BoardData> {
     const inProgress = projs.reduce((n, p) => n + p.inProgress, 0);
     return {
       key,
-      name: key === NO_CLIENT ? 'Internal / no client' : cleanClientName(namesByClient.get(key) ?? []),
+      name: key === NO_CLIENT ? 'Internal / no client'
+        : key === INTERNAL_EMAIL ? 'Gershon (internal)'
+        : cleanClientName(namesByClient.get(key) ?? [], serviceLabels),
       email: key === NO_CLIENT ? null : key,
       projects: projs,
       total,

@@ -1,86 +1,91 @@
 export const runtime = 'edge'
 
 import { notFound } from 'next/navigation'
-import { supabaseAdmin } from '@/lib/supabaseServer'
+import Link from 'next/link'
+import { supabaseAdmin, type ProjectRow, type TaskRow } from '@/lib/supabaseServer'
 import { loadTemplateMap } from '@/lib/templates/runtime'
+import { cleanClient, etToday } from '@/lib/myWork'
+import PrintButton from '@/components/PrintButton'
 
+function nice(d: string) {
+  return new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+}
+
+/** Printable one-page status report for a project — shareable with the client. */
 export default async function ReportPage(props: { params: Promise<{ id: string }> }) {
-  const tplMap = await loadTemplateMap()
   const { id } = await props.params
   const supa = supabaseAdmin()
-
-  const { data: project } = await supa.from('projects').select('*').eq('id', id).maybeSingle()
+  const [{ data: project }, { data: tasks }, tplMap] = await Promise.all([
+    supa.from('projects').select('*').eq('id', id).maybeSingle(),
+    supa.from('tasks').select('*').eq('project_id', id).order('position', { ascending: true }),
+    loadTemplateMap(),
+  ])
   if (!project) notFound()
+  const p = project as ProjectRow
+  const rows = (tasks ?? []) as TaskRow[]
+  const tpl = tplMap.get(p.template_slug)
+  const today = etToday()
 
-  const { data: tasks } = await supa.from('tasks').select('*').eq('project_id', id).order('position', { ascending: true })
-  const taskRows = tasks ?? []
+  const total = rows.length
+  const completed = rows.filter(t => t.status === 'completed')
+  const open = rows.filter(t => t.status !== 'completed').sort((a, b) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999'))
+  const late = open.filter(t => t.due_date && t.due_date < today)
+  const pct = total === 0 ? 0 : Math.round((completed.length / total) * 100)
 
-  const tpl = tplMap.get(project.template_slug)
-  const total = taskRows.length
-  const done = taskRows.filter((t: { status: string }) => t.status === 'completed').length
-  const pct = total === 0 ? 0 : Math.round(done / total * 100)
-
-  const pending = taskRows.filter((t: { status: string }) => t.status === 'pending')
-  const inProgress = taskRows.filter((t: { status: string }) => t.status === 'in_progress')
-  const completed = taskRows.filter((t: { status: string }) => t.status === 'completed')
+  const stat = (label: string, value: string | number, tone = '') => (
+    <div className="bg-white border border-[#e5e7eb] rounded-xl px-4 py-3 print:border-[#ccc]">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[#6e6e73]">{label}</div>
+      <div className={`text-[24px] font-extrabold tracking-tight ${tone}`}>{value}</div>
+    </div>
+  )
+  const line = (t: TaskRow, showDue: boolean) => {
+    const isLate = t.status !== 'completed' && t.due_date && t.due_date < today
+    return (
+      <li key={t.id} className="flex items-baseline justify-between gap-4 py-2 border-b border-[#f0f0f2] text-[14px]">
+        <span>{t.status === 'in_progress' && <span className="mr-2 text-[10px] font-bold uppercase text-amber-700">in progress</span>}{t.name}</span>
+        <span className={`text-[12px] shrink-0 ${isLate ? 'text-brand-600 font-semibold' : 'text-[#6e6e73]'}`}>
+          {t.assigned_to ?? 'Unassigned'}{showDue && t.due_date ? ' · ' + (isLate ? 'late, was due ' : 'due ') + nice(t.due_date) : ''}
+        </span>
+      </li>
+    )
+  }
 
   return (
-    <html lang="en">
-      <head>
-        <title>Status Report — {project.company_name}</title>
-        <style>{`
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 24px; color: #1e293b; }
-          h1 { font-size: 22px; margin: 0 0 4px; }
-          .subtitle { color: #64748b; font-size: 13px; margin: 0 0 24px; }
-          .stats { display: flex; gap: 16px; margin-bottom: 24px; }
-          .stat { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; min-width: 80px; }
-          .stat-value { font-size: 24px; font-weight: 700; color: #6366f1; }
-          .stat-label { font-size: 11px; color: #94a3b8; text-transform: uppercase; margin-top: 2px; }
-          h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin: 20px 0 8px; }
-          ul { margin: 0; padding: 0; list-style: none; }
-          li { padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; display: flex; justify-content: space-between; }
-          .tag { font-size: 11px; color: #94a3b8; }
-          .no-print { margin-top: 24px; }
-          @media print { .no-print { display: none; } }
-        `}</style>
-      </head>
-      <body>
-        <h1>{tpl?.icon} {project.company_name}</h1>
-        <p className="subtitle">{tpl?.label} · Status: {project.status.replace('_', ' ')} · Generated {new Date().toLocaleDateString()}</p>
-
-        <div className="stats">
-          <div className="stat"><div className="stat-value">{pct}%</div><div className="stat-label">Complete</div></div>
-          <div className="stat"><div className="stat-value">{done}</div><div className="stat-label">Done</div></div>
-          <div className="stat"><div className="stat-value">{inProgress.length}</div><div className="stat-label">In Progress</div></div>
-          <div className="stat"><div className="stat-value">{pending.length}</div><div className="stat-label">Pending</div></div>
+    <div className="min-h-screen bg-[#fafafa] print:bg-white">
+      <div className="max-w-3xl mx-auto px-5 py-8">
+        <div className="flex items-center justify-between mb-6 print:hidden">
+          <Link href={'/projects/' + p.id} className="text-sm text-[#6e6e73] hover:text-brand-600">← Back to project</Link>
+          <PrintButton />
         </div>
+        <div className="flex items-center gap-2 mb-1">
+          <svg viewBox="0 0 64 64" width="22" height="22"><rect width="64" height="64" rx="14" fill="#FE1B04" /><path d="M18 33l9 9 19-20" fill="none" stroke="#fff" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <span className="text-[12px] font-semibold text-[#6e6e73]">Gershon Consulting · Status report</span>
+        </div>
+        <h1 className="text-[26px] font-extrabold tracking-tight">{cleanClient(p.company_name)}</h1>
+        <p className="text-[13px] text-[#6e6e73] mb-6">{tpl?.icon} {tpl?.label ?? p.template_slug} · started {p.start_date ? nice(p.start_date) : '—'} · report of {nice(today)}</p>
 
-        {inProgress.length > 0 && (
-          <>
-            <h2>In Progress</h2>
-            <ul>{inProgress.map((t: { id: string; name: string; assigned_to: string | null; due_date: string | null }) => <li key={t.id}><span>{t.name}</span><span className="tag">{t.assigned_to ?? 'Unassigned'}{t.due_date ? ` · ${t.due_date}` : ''}</span></li>)}</ul>
-          </>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+          {stat('Complete', pct + '%')}
+          {stat('Done', completed.length, 'text-[#057642]')}
+          {stat('Still to do', open.length)}
+          {stat('Late', late.length, late.length ? 'text-brand-600' : '')}
+        </div>
+        <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden mb-8"><div className="h-2 bg-brand-600 rounded-full" style={{ width: pct + '%' }} /></div>
+
+        {open.length > 0 && (
+          <section className="mb-8">
+            <h2 className="text-[13px] font-extrabold uppercase tracking-[0.06em] text-[#6e6e73] mb-1">Next steps</h2>
+            <ul>{open.map(t => line(t, true))}</ul>
+          </section>
         )}
-
-        {pending.length > 0 && (
-          <>
-            <h2>Pending</h2>
-            <ul>{pending.map((t: { id: string; name: string; assigned_to: string | null; due_date: string | null }) => <li key={t.id}><span>{t.name}</span><span className="tag">{t.assigned_to ?? 'Unassigned'}{t.due_date ? ` · ${t.due_date}` : ''}</span></li>)}</ul>
-          </>
-        )}
-
         {completed.length > 0 && (
-          <>
-            <h2>Completed</h2>
-            <ul>{completed.map((t: { id: string; name: string; assigned_to: string | null }) => <li key={t.id}><span>{t.name}</span><span className="tag">{t.assigned_to ?? 'Unassigned'}</span></li>)}</ul>
-          </>
+          <section>
+            <h2 className="text-[13px] font-extrabold uppercase tracking-[0.06em] text-[#057642] mb-1">Done</h2>
+            <ul>{completed.map(t => line(t, false))}</ul>
+          </section>
         )}
-
-        <div className="no-print" style={{ marginTop: 32 }}>
-          <button onClick={() => window.print()} style={{ padding: '8px 16px', background: '#6366f1', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14 }}>Print / Save PDF</button>
-          <a href={`/projects/${id}`} style={{ marginLeft: 12, fontSize: 14, color: '#6366f1' }}>← Back to project</a>
-        </div>
-      </body>
-    </html>
+        {total === 0 && <p className="text-[#6e6e73]">This project has no tasks yet.</p>}
+      </div>
+    </div>
   )
-                                                                       }
+}

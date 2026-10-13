@@ -34,6 +34,10 @@ export interface MyWork {
   doneLast7: WorkTask[]
   team: MemberLoad[]
   unassignedOverdue: number
+  /** Whole-team numbers for the dashboard. */
+  totals: { open: number; late: number; dueNext7: number; doneLast7: number; unassigned: number }
+  /** Tasks marked done per week, oldest first (last 8 weeks, weeks start Monday). */
+  weekly: { weekStart: string; done: number }[]
 }
 
 /** Today in New York as YYYY-MM-DD. */
@@ -118,5 +122,20 @@ export async function loadMyWork(who: { id?: string; name: string; email: string
   })
   const unassignedOverdue = all.filter(t => !t.assignedTo && t.status !== 'completed' && t.dueDate && t.dueDate < today).length
 
-  return { today, weekEnd, overdue, dueToday, thisWeek, later, noDate, doneLast7, team: teamLoad, unassignedOverdue }
+  const openAll = all.filter(t => t.status !== 'completed')
+  const totals = {
+    open: openAll.length,
+    late: openAll.filter(t => t.dueDate && t.dueDate < today).length,
+    dueNext7: openAll.filter(t => t.dueDate && t.dueDate >= today && t.dueDate <= weekEnd).length,
+    doneLast7: all.filter(t => t.status === 'completed' && t.updatedAt.slice(0, 10) >= weekAgo).length,
+    unassigned: openAll.filter(t => !t.assignedTo).length,
+  }
+  const dow = (new Date(today + 'T12:00:00Z').getUTCDay() + 6) % 7
+  const thisMonday = addDays(today, -dow)
+  const weekly = Array.from({ length: 8 }, (_, i) => {
+    const start = addDays(thisMonday, -7 * (7 - i)), end = addDays(start, 7)
+    return { weekStart: start, done: all.filter(t => t.status === 'completed' && t.updatedAt.slice(0, 10) >= start && t.updatedAt.slice(0, 10) < end).length }
+  })
+
+  return { today, weekEnd, overdue, dueToday, thisWeek, later, noDate, doneLast7, team: teamLoad, unassignedOverdue, totals, weekly }
 }

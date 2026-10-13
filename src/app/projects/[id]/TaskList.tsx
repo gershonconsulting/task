@@ -45,10 +45,23 @@ function ToolBadge({ tool }: { tool: ToolDef }) {
 }
 
 const STATUS_STYLES: Record<TaskRow['status'], string> = {
-  pending: 'bg-amber-50 border-amber-200',
-  in_progress: 'bg-blue-50 border-blue-200',
-  completed: 'bg-emerald-50 border-emerald-200',
+  pending: 'bg-white border-[#e5e7eb] border-l-slate-300',
+  in_progress: 'bg-white border-[#e5e7eb] border-l-amber-500',
+  completed: 'bg-[#fafafa] border-[#eef0f2] border-l-green-500 opacity-80',
 };
+
+function etToday(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
+function dueText(due: string | null, done: boolean, today: string): { text: string; cls: string } | null {
+  if (!due) return null;
+  const nice = new Date(due + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+  if (done) return { text: nice, cls: 'text-slate-400' };
+  const days = Math.round((new Date(today + 'T12:00:00Z').getTime() - new Date(due + 'T12:00:00Z').getTime()) / 86400000);
+  if (days > 0) return { text: `${days} day${days === 1 ? '' : 's'} late · ${nice}`, cls: 'text-brand-600 font-semibold' };
+  if (days === 0) return { text: 'Due today', cls: 'text-amber-700 font-semibold' };
+  return { text: 'Due ' + nice, cls: 'text-slate-500' };
+}
 const PRIORITY_DOT: Record<TaskRow['priority'], string> = {
   low: 'bg-slate-400',
   medium: 'bg-amber-500',
@@ -59,37 +72,44 @@ export default function TaskList({ projectId, tasks, canEditMeta, canDelete, too
   if (tasks.length === 0) {
     return <p className="text-sm text-slate-500 italic">No tasks in this project.</p>;
   }
+  const today = etToday();
+  const open = tasks.filter(t => t.status !== 'completed')
+    .sort((a, b) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999') || a.position - b.position);
+  const done = tasks.filter(t => t.status === 'completed');
+  const late = open.filter(t => t.due_date && t.due_date < today).length;
+  const item = (t: TaskRow) => (
+    <TaskItem key={t.id} t={t} projectId={projectId} canEditMeta={canEditMeta} canDelete={canDelete} tools={tools} team={team} today={today} />
+  );
   return (
     <section>
-      <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-3">
-        Tasks ({tasks.length})
-      </h2>
-      <ul className="space-y-2">
-        {tasks.map((t) => (
-          <TaskItem
-            key={t.id}
-            t={t}
-            projectId={projectId}
-            canEditMeta={canEditMeta}
-            canDelete={canDelete}
-            tools={tools}
-            team={team}
-          />
-        ))}
-      </ul>
+      <div className="flex items-baseline justify-between mb-3">
+        <h2 className="text-[15px] font-bold">To do <span className="text-[#6e6e73] font-medium">({open.length})</span></h2>
+        <span className="text-[12px] text-[#6e6e73]">{late > 0 ? <span className="text-brand-600 font-semibold">{late} late · </span> : null}most urgent first · change the status on the left</span>
+      </div>
+      {open.length === 0
+        ? <p className="text-sm text-[#057642] bg-white border border-[#e5e7eb] rounded-xl px-4 py-3">Everything in this project is done. ✓</p>
+        : <ul className="space-y-2">{open.map(item)}</ul>}
+      {done.length > 0 && (
+        <details className="mt-6">
+          <summary className="cursor-pointer text-[13px] font-semibold text-[#6e6e73] hover:text-brand-600">Done ({done.length})</summary>
+          <ul className="space-y-2 mt-3">{done.map(item)}</ul>
+        </details>
+      )}
     </section>
   );
 }
 
 function TaskItem({
-  t, projectId, canEditMeta, canDelete, tools, team,
-}: { t: TaskRow; projectId: string; canEditMeta: boolean; canDelete: boolean; tools: ToolDef[]; team: string[] }) {
+  t, projectId, canEditMeta, canDelete, tools, team, today,
+}: { t: TaskRow; projectId: string; canEditMeta: boolean; canDelete: boolean; tools: ToolDef[]; team: string[]; today: string }) {
+  const due = dueText(t.due_date, t.status === 'completed', today);
+  const isLate = t.status !== 'completed' && !!t.due_date && t.due_date < today;
   const [expanded, setExpanded] = useState(false);
   const toolMap = Object.fromEntries(tools.map(t => [t.slug, t]));
   const taskTool = (t as any).tool ? toolMap[(t as any).tool] : null;
 
   return (
-    <li className={'rounded-lg border-2 ' + STATUS_STYLES[t.status] + ' p-3'}>
+    <li className={'rounded-xl border border-l-4 ' + (isLate ? 'bg-white border-[#e5e7eb] border-l-brand-600' : STATUS_STYLES[t.status]) + ' p-3'}>
       <div className="flex items-start gap-3">
         <form action={updateTaskStatus} className="flex-shrink-0">
           <input type="hidden" name="taskId" value={t.id} />
@@ -98,24 +118,24 @@ function TaskItem({
             name="status"
             defaultValue={t.status}
             onChange={(e) => e.currentTarget.form?.requestSubmit()}
-            className="text-xs font-semibold rounded border border-slate-300 px-1.5 py-1 bg-white"
+            className="text-xs font-semibold rounded-lg border border-[#e5e7eb] px-2 py-1.5 bg-white"
           >
-            <option value="pending">Pending</option>
-            <option value="in_progress">In Progress</option>
-            <option value="completed">✓ Completed</option>
+            <option value="pending">To do</option>
+            <option value="in_progress">In progress</option>
+            <option value="completed">✓ Done</option>
           </select>
         </form>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className={'inline-block w-2 h-2 rounded-full ' + PRIORITY_DOT[t.priority]} />
-            <span className="font-medium text-slate-900 text-sm">{t.name}</span>
+            <span className={'font-medium text-sm ' + (t.status === 'completed' ? 'text-slate-500 line-through decoration-slate-300' : 'text-slate-900')}>{t.name}</span>
             {taskTool && <ToolBadge tool={taskTool} />}
           </div>
           <div className="flex items-center gap-3 mt-1 text-xs text-slate-600 flex-wrap">
-            <span>👤 {t.assigned_to ?? <em className="italic text-slate-400">unassigned</em>}</span>
-            {t.due_date && <span>📅 {t.due_date}</span>}
-            <span className="uppercase tracking-wider font-semibold opacity-70">{t.priority}</span>
+            <span>👤 {t.assigned_to ?? <em className="italic text-brand-600 not-italic font-semibold">nobody assigned</em>}</span>
+            {due && <span className={due.cls}>📅 {due.text}</span>}
+            {t.priority === 'high' && <span className="uppercase tracking-wider font-bold text-[10px] text-brand-700 bg-brand-50 border border-brand-100 rounded px-1.5 py-0.5">high priority</span>}
             <button type="button" onClick={() => setExpanded(v => !v)} className="ml-auto text-indigo-600 hover:text-indigo-800 text-xs">
               {expanded ? '× collapse' : 'edit ▾'}
             </button>

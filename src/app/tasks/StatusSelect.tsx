@@ -2,7 +2,7 @@
 import { updateTaskStatusGlobal } from '@/lib/actions'
 
 const STYLE: Record<string, string> = {
-  pending: 'bg-slate-100 text-slate-600 border-slate-200',
+  pending: 'bg-white text-slate-700 border-[#e5e7eb]',
   in_progress: 'bg-amber-100 text-amber-700 border-amber-300',
   completed: 'bg-green-100 text-green-700 border-green-300',
 }
@@ -19,7 +19,7 @@ export default function StatusSelect({ taskId, projectId, status }: { taskId: st
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
         className={`text-xs px-2 py-1 rounded-full border font-medium cursor-pointer transition ${STYLE[st] ?? STYLE.pending}`}
       >
-        <option value='pending'>Pending</option>
+        <option value='pending'>To do</option>
         <option value='in_progress'>In progress</option>
         <option value='completed'>Done</option>
       </select>

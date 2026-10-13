@@ -75,60 +75,45 @@ export default function TeamEditor() {
       )}
 
       {members.map((m, idx) => (
-        <div key={m.id} className="flex flex-wrap items-center gap-2 p-3 bg-slate-50 rounded-md">
-          <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
-            {m.name ? m.name[0].toUpperCase() : '?'}
+        <div key={m.id} className="p-4 bg-[#fafafa] border border-[#e5e7eb] rounded-xl">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 rounded-full bg-brand-600 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
+              {m.name ? m.name[0].toUpperCase() : '?'}
+            </div>
+            <input value={m.name} onChange={e => update(idx, { name: e.target.value })} placeholder="Full name"
+              className="flex-1 min-w-0 px-3 py-2 rounded-lg border border-[#e5e7eb] text-sm font-semibold bg-white focus:outline-none focus:border-brand-600" />
+            <select value={m.role} onChange={e => update(idx, { role: e.target.value as 'admin' | 'team' })}
+              className="px-2 py-2 rounded-lg border border-[#e5e7eb] text-sm bg-white focus:outline-none focus:border-brand-600">
+              <option value="team">Team</option>
+              <option value="admin">Admin</option>
+            </select>
+            <button type="button" onClick={() => remove(idx)} className="text-[#6e6e73] hover:text-red-600 text-xs font-semibold px-1" title="Remove member">Remove</button>
           </div>
-          <input
-            value={m.name}
-            onChange={e => update(idx, { name: e.target.value })}
-            placeholder="Full name"
-            className="flex-1 min-w-[120px] px-2 py-1.5 rounded border border-slate-200 text-sm bg-white focus:outline-none focus:border-indigo-400"
-          />
-          <input
-            value={m.email}
-            onChange={e => update(idx, { email: e.target.value })}
-            placeholder="email@gershonconsulting.com"
-            type="email"
-            className="flex-[2] min-w-[180px] px-2 py-1.5 rounded border border-slate-200 text-sm bg-white focus:outline-none focus:border-indigo-400"
-          />
-          <input
-            value={m.linkedin ?? ''}
-            onChange={e => update(idx, { linkedin: e.target.value })}
-            placeholder='LinkedIn profile URL (used to sign in)'
-            type='url'
-            className='flex-[2] min-w-[160px] px-2 py-1.5 rounded border border-slate-200 text-sm bg-white focus:outline-none focus:border-indigo-400'
-          />
-          <input
-            value={m.linkedinEmail ?? ''}
-            onChange={e => update(idx, { linkedinEmail: e.target.value })}
-            placeholder='LinkedIn login email (if different)'
-            type='email'
-            className='flex-[2] min-w-[160px] px-2 py-1.5 rounded border border-slate-200 text-sm bg-white focus:outline-none focus:border-indigo-400'
-          />
-          <span
-            title={m.linkedinLinked ? 'Signed in with LinkedIn' + (m.lastLogin ? ' — last ' + new Date(m.lastLogin).toLocaleDateString() : '') : 'Has not signed in with LinkedIn yet'}
-            className={`text-[11px] font-semibold px-2 py-1 rounded-full ${m.linkedinLinked && !m.unlink ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}
-          >
-            {m.linkedinLinked && !m.unlink ? 'in LinkedIn ✓' : 'not signed in yet'}
-          </span>
-          {m.linkedinLinked && !m.unlink && (
-            <button type='button' onClick={() => update(idx, { unlink: true })} className='text-[11px] text-slate-400 hover:text-red-600 underline' title='Forget the LinkedIn account bound to this member'>unlink</button>
-          )}
-          <select
-            value={m.role}
-            onChange={e => update(idx, { role: e.target.value as 'admin' | 'team' })}
-            className="px-2 py-1.5 rounded border border-slate-200 text-sm bg-white focus:outline-none focus:border-indigo-400"
-          >
-            <option value="team">Team</option>
-            <option value="admin">Admin</option>
-          </select>
-          <button
-            type="button"
-            onClick={() => remove(idx)}
-            className="text-red-400 hover:text-red-600 text-xs font-bold px-1"
-            title="Remove member"
-          >✕</button>
+          <div className="grid sm:grid-cols-3 gap-3">
+            <label className="block">
+              <span className="block text-[11px] font-semibold text-[#6e6e73] mb-1">Work email (Friday report goes here)</span>
+              <input value={m.email} onChange={e => update(idx, { email: e.target.value })} type="email" placeholder="name@gershonconsulting.com"
+                className="w-full px-3 py-2 rounded-lg border border-[#e5e7eb] text-sm bg-white focus:outline-none focus:border-brand-600" />
+            </label>
+            <label className="block">
+              <span className="block text-[11px] font-semibold text-[#6e6e73] mb-1">LinkedIn profile (needed to sign in)</span>
+              <input value={m.linkedin ?? ''} onChange={e => update(idx, { linkedin: e.target.value })} type="url" placeholder="https://www.linkedin.com/in/…"
+                className="w-full px-3 py-2 rounded-lg border border-[#e5e7eb] text-sm bg-white focus:outline-none focus:border-brand-600" />
+            </label>
+            <label className="block">
+              <span className="block text-[11px] font-semibold text-[#6e6e73] mb-1">LinkedIn login email, if different</span>
+              <input value={m.linkedinEmail ?? ''} onChange={e => update(idx, { linkedinEmail: e.target.value })} type="email" placeholder="optional"
+                className="w-full px-3 py-2 rounded-lg border border-[#e5e7eb] text-sm bg-white focus:outline-none focus:border-brand-600" />
+            </label>
+          </div>
+          <div className="mt-2 flex items-center gap-2 text-[11px]">
+            <span className={`font-semibold px-2 py-0.5 rounded-full ${m.linkedinLinked && !m.unlink ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-white text-[#6e6e73] border border-[#e5e7eb]'}`}>
+              {m.linkedinLinked && !m.unlink ? 'Signed in with LinkedIn' + (m.lastLogin ? ' · last ' + new Date(m.lastLogin).toLocaleDateString() : '') : 'Has not signed in yet'}
+            </span>
+            {m.linkedinLinked && !m.unlink && (
+              <button type="button" onClick={() => update(idx, { unlink: true })} className="text-[#6e6e73] hover:text-red-600 underline" title="Forget the LinkedIn account bound to this member">unlink</button>
+            )}
+          </div>
         </div>
       ))}
 

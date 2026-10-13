@@ -23,6 +23,8 @@ export interface BoardCard {
   status: ProjStatus
   /** Rendered inside an expandable card — used by the By Client view. */
   detail?: ProviderShare[]
+  /** What to do next on this project. */
+  next?: { name: string; who: string | null; due: string | null; daysLate: number } | null
 }
 
 export interface BoardRow {
@@ -34,8 +36,8 @@ export interface BoardRow {
   cells: BoardCard[][]
 }
 
-const COL_W = 292
-const LABEL_W = 124
+const COL_W = 250
+const LABEL_W = 108
 
 function ProgressBar({ pct, tone }: { pct: number; tone: string }) {
   return (
@@ -71,11 +73,20 @@ function CardBody({ card }: { card: BoardCard }) {
         <span className="text-sm leading-tight shrink-0">{card.icon}</span>
         <span className="font-semibold text-[13px] leading-tight text-slate-900 min-w-0">{card.label}</span>
       </div>
-      <div className="text-[10px] uppercase tracking-wide text-slate-400 mt-1">{card.meta}</div>
+      {card.next && card.status !== 'complete' && (
+        <div className="mt-1.5 text-[12px] leading-snug">
+          <span className="text-[#6e6e73]">Next: </span>
+          <span className="text-slate-800">{card.next.name}</span>
+          <div className="text-[11px] mt-0.5">
+            <span className={card.next.who ? 'text-[#6e6e73]' : 'text-brand-600 font-semibold'}>{card.next.who ?? 'nobody assigned'}</span>
+            {card.next.daysLate > 0 && <span className="text-brand-600 font-semibold"> · {card.next.daysLate}d late</span>}
+          </div>
+        </div>
+      )}
       <ProgressBar pct={pct} tone={s.bar} />
       <div className="flex items-center justify-between gap-2 mt-2">
         <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full ${s.pill}`}>
-          {card.status === 'overdue' ? `${card.overdue} overdue` : s.label}
+          {card.status === 'overdue' ? `${card.overdue} late` : s.label}
         </span>
         <span className="text-[11px] text-slate-500 tabular-nums">{card.done}/{card.total}</span>
       </div>
@@ -85,7 +96,7 @@ function CardBody({ card }: { card: BoardCard }) {
 
 function Card({ card }: { card: BoardCard }) {
   const s = STATUS[card.status]
-  const shell = `block w-full text-left bg-slate-50 border border-slate-200 border-l-[3px] ${s.edge} rounded-lg p-2.5 transition hover:shadow-md hover:border-slate-300`
+  const shell = `block w-full text-left bg-white border border-[#e5e7eb] border-l-[3px] ${s.edge} rounded-lg p-2.5 transition hover:shadow-md hover:border-slate-300`
 
   if (card.detail && card.detail.length > 0) {
     return (
@@ -113,9 +124,8 @@ function Card({ card }: { card: BoardCard }) {
 function ClientHeader({ client }: { client: BoardClient }) {
   const s = STATUS[client.status]
   return (
-    <div className="sticky top-0 z-20 mt-4 bg-white border border-slate-200 border-b-0 rounded-t-xl px-3 pt-3 pb-3 shadow-[0_6px_12px_-8px_rgba(15,23,42,0.28)]">
-      <div className="font-bold text-[15px] leading-tight text-slate-900 truncate">{client.name}</div>
-      <div className="text-[11px] text-slate-400 truncate">{client.email ?? '—'}</div>
+    <div className="mt-1 bg-white border border-[#e5e7eb] border-b-0 rounded-t-xl px-3 pt-3 pb-3">
+      <div className="font-bold text-[15px] leading-tight text-slate-900 truncate" title={client.email ?? ''}>{client.name}</div>
       <div className="flex items-end justify-between gap-2 mt-2">
         <div className="text-lg font-extrabold text-slate-900 tabular-nums leading-none">
           {client.pct}<span className="text-xs">%</span>
@@ -127,13 +137,13 @@ function ClientHeader({ client }: { client: BoardClient }) {
       </div>
       <ProgressBar pct={client.pct} tone={s.bar} />
       <span className={`inline-block mt-2 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full ${s.pill}`}>
-        {client.overdue > 0 ? `${client.overdue} overdue` : s.label}
+        {client.overdue > 0 ? `${client.overdue} late tasks` : s.label}
       </span>
     </div>
   )
 }
 
-export default function ClientBoard({ clients, rows, maxHeight = 'calc(100vh - 14rem)' }: { clients: BoardClient[]; rows: BoardRow[]; maxHeight?: string }) {
+export default function ClientBoard({ clients, rows }: { clients: BoardClient[]; rows: BoardRow[]; maxHeight?: string }) {
   if (clients.length === 0) {
     return <p className="text-slate-400 text-sm">No clients yet.</p>
   }
@@ -143,11 +153,12 @@ export default function ClientBoard({ clients, rows, maxHeight = 'calc(100vh - 1
   const gridCols = (labelled ? `${LABEL_W}px ` : '') + `repeat(${clients.length}, ${COL_W}px)`
 
   return (
-    <div className="overflow-auto -mx-1 px-1" style={{ maxHeight }}>
+    <div className="overflow-x-auto -mx-1 px-1 pb-3">
+      {clients.length > 4 && <p className="text-[11px] text-[#6e6e73] mb-1">{clients.length} clients · scroll sideways for more →</p>}
       <div className="grid gap-x-3.5 w-max min-w-full" style={{ gridTemplateColumns: gridCols }}>
 
         {labelled && (
-          <div className="sticky top-0 left-0 z-30 bg-slate-50 shadow-[8px_0_8px_-8px_rgba(15,23,42,0.16)]" />
+          <div className="sticky left-0 z-30 bg-[#fafafa]" />
         )}
         {clients.map(c => <ClientHeader key={c.key} client={c} />)}
 
@@ -157,7 +168,7 @@ export default function ClientBoard({ clients, rows, maxHeight = 'calc(100vh - 1
           return (
             <div key={row.id} className="contents">
               {labelled && (
-                <div className="sticky left-0 z-10 self-stretch bg-slate-50 pr-3.5 pt-4 pb-3 shadow-[8px_0_8px_-8px_rgba(15,23,42,0.16)]">
+                <div className="sticky left-0 z-10 self-stretch bg-[#fafafa] pr-3 pt-4 pb-3 border-t border-[#e5e7eb]">
                   <div className={`text-[10px] font-bold uppercase tracking-wider leading-tight ${row.tone ? STATUS[row.tone].text : 'text-slate-500'}`}>
                     {row.label}
                   </div>
@@ -175,7 +186,7 @@ export default function ClientBoard({ clients, rows, maxHeight = 'calc(100vh - 1
                   >
                     <div className="flex flex-col gap-2 py-3">
                       {cards.length === 0
-                        ? <div className="text-[11px] text-slate-300 italic">—</div>
+                        ? <div className="h-1" />
                         : cards.map(card => <Card key={card.key} card={card} />)}
                     </div>
                   </div>
@@ -217,5 +228,6 @@ export function toCard(p: BoardProject, opts?: { detail?: boolean; share?: Provi
     overdue,
     status,
     detail: opts?.detail ? p.providers : undefined,
+    next: share ? null : p.next,
   }
 }
