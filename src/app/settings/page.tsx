@@ -22,7 +22,7 @@ export default async function SettingsPage() {
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
           <h2 className="text-base font-semibold text-slate-900 mb-1">Team Members</h2>
           <p className="text-sm text-slate-500 mb-4">
-            Add, edit or remove team members. Changes apply to all assignee dropdowns.
+            Add, edit or remove team members. Changes apply to all assignee dropdowns. To create a user from their LinkedIn profile and send them an invite, use <a href="/admin" className="text-brand-600 font-semibold">Admin · Users</a>.
           </p>
           <TeamEditor />
         </div>

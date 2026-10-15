@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import pkg from '../../../package.json'
 
 const ERRORS: Record<string, string> = {
-  not_registered: 'This LinkedIn account is not on the Gershon Consulting team list. Ask an admin to add your LinkedIn profile in Settings → Team members.',
+  not_registered: 'This LinkedIn account is not on the Gershon Consulting team list. Ask Olivier to add you in Admin → Users (he will send you an invite link).',
   linkedin_cancelled: 'LinkedIn sign-in was cancelled.',
   state: 'The sign-in took too long or was opened in another tab. Please try again.',
   token: 'LinkedIn refused the sign-in. Please try again.',
@@ -28,6 +28,7 @@ function LoginInner() {
   const detail = sp.get('detail')
   const next = sp.get('next') || '/dashboard'
   const signedOut = sp.get('signed_out')
+  const invite = (sp.get('invite') || '').replace(/[^a-zA-Z0-9-]/g, '')
   const [showClient, setShowClient] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -73,6 +74,11 @@ function LoginInner() {
           <h1 className="text-2xl font-bold tracking-tight">Sign in</h1>
           <p className="text-sm text-[#6e6e73] mt-1 mb-7">Gershon Consulting team — use your LinkedIn account.</p>
 
+          {invite && !err && (
+            <div className="mb-5 text-sm rounded-lg border border-[#c7dcf2] bg-[#eef5fc] px-4 py-3 text-[#0a4a8c]">
+              <strong>You have been invited.</strong> Sign in with LinkedIn once through this page to activate your access.
+            </div>
+          )}
           {signedOut && !err && (
             <div className="mb-5 text-sm rounded-lg border border-[#e5e7eb] bg-white px-4 py-3 text-[#6e6e73]">You are signed out.</div>
           )}
@@ -84,13 +90,13 @@ function LoginInner() {
           )}
 
           <a
-            href={'/api/auth/linkedin/login?next=' + encodeURIComponent(next)}
+            href={'/api/auth/linkedin/login?next=' + encodeURIComponent(next) + (invite ? '&invite=' + invite : '')}
             className="w-full inline-flex items-center justify-center gap-3 rounded-lg bg-[#0a66c2] hover:bg-[#004182] text-white font-semibold text-[15px] py-3 shadow-sm transition-colors"
           >
             <LinkedInLogo /> Sign in with LinkedIn
           </a>
           <p className="text-xs text-[#6e6e73] mt-3 leading-relaxed">
-            Only people listed in <strong>Settings → Team members</strong> with their LinkedIn profile can enter.
+            Only people added by an admin can enter. New here? Use the invite link you received.
           </p>
 
           <div className="mt-10 pt-6 border-t border-[#e5e7eb]">

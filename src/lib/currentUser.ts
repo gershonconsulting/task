@@ -12,6 +12,7 @@ export interface CurrentUser {
   role: 'admin' | 'team' | 'client'
   projectId?: string
   mustChangePassword?: boolean
+  liEmail?: string
 }
 
 export async function getCurrentUser(): Promise<CurrentUser> {
@@ -26,6 +27,7 @@ export async function getCurrentUser(): Promise<CurrentUser> {
         role: session.user.role ?? 'team',
         projectId: session.user.projectId,
         mustChangePassword: session.user.mustChangePassword,
+        liEmail: session.user.liEmail,
       }
     }
   } catch {

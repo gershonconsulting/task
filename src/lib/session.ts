@@ -10,6 +10,8 @@ export interface SessionData {
     projectId?: string
     mustChangePassword?: boolean
     picture?: string
+    /** E-mail of the LinkedIn account used to sign in. */
+    liEmail?: string
   }
 }
 

@@ -8,6 +8,7 @@ import pkg from '../../package.json'
 interface SidebarProps {
   userName: string
   userRole: string
+  isOwner?: boolean
 }
 
 type Item = { href: string; label: string; icon: string }
@@ -25,6 +26,7 @@ const I = {
   cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
   doc: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
   out: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
 }
 
@@ -69,7 +71,7 @@ async function handleLogout() {
   window.location.href = '/login?signed_out=1'
 }
 
-export default function Sidebar({ userName, userRole }: SidebarProps) {
+export default function Sidebar({ userName, userRole, isOwner }: SidebarProps) {
   const path = usePathname()
   const [open, setOpen] = useState(false)
   const isClient = userRole === 'client'
@@ -107,6 +109,11 @@ export default function Sidebar({ userName, userRole }: SidebarProps) {
         ))}
       </nav>
       <div className="mt-3 pt-3 border-t border-[#e5e7eb] flex flex-col gap-0.5">
+        {isOwner && (
+          <Link href="/admin" className={linkCls(isActive('/admin'))} onClick={() => setOpen(false)}>
+            <Icon d={I.shield} /> Admin · Users
+          </Link>
+        )}
         {!isClient && (
           <Link href="/settings" className={linkCls(isActive('/settings'))} onClick={() => setOpen(false)}>
             <Icon d={I.gear} /> Settings

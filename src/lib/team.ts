@@ -18,6 +18,13 @@ export interface TeamMember {
   linkedinSub?: string
   /** Last successful LinkedIn sign-in (ISO). */
   lastLogin?: string
+  /** LinkedIn photo, saved at sign-in (shown in the admin panel). */
+  picture?: string
+  /** One-time invite token: whoever signs in with LinkedIn through this link becomes this member. */
+  inviteToken?: string
+  invitedAt?: string
+  createdAt?: string
+  createdBy?: string
 }
 
 export const DEFAULT_TEAM: TeamMember[] = [
@@ -26,6 +33,25 @@ export const DEFAULT_TEAM: TeamMember[] = [
 
 /** The owner's own addresses — always let in as admin, so he can never be locked out. */
 export const OWNER_EMAILS = ['olivier@gershonconsulting.com', 'olivier@attia.com', 'oattia@gmail.com']
+
+/** Is this signed-in user the platform owner (Olivier)? Only the owner sees the Admin panel. */
+export function isOwnerUser(u: { role?: string; email?: string; liEmail?: string } | null | undefined): boolean {
+  if (!u || u.role !== 'admin') return false
+  return OWNER_EMAILS.includes(norm(u.email)) || OWNER_EMAILS.includes(norm(u.liEmail))
+}
+
+/** "https://linkedin.com/in/Jane-Doe-123/?x" → "https://www.linkedin.com/in/jane-doe-123/" ; null if not a profile URL. */
+export function normalizeLinkedInUrl(raw: string | null | undefined): string | null {
+  const m = String(raw ?? '').trim().match(/linkedin\.com\/in\/([^/?#\s]+)/i)
+  if (!m) return null
+  let slug = m[1]
+  try { slug = decodeURIComponent(slug) } catch { /* keep */ }
+  return `https://www.linkedin.com/in/${slug.toLowerCase()}/`
+}
+
+export function linkedInSlug(url: string | null | undefined): string {
+  return (normalizeLinkedInUrl(url) ?? '').replace('https://www.linkedin.com/in/', '').replace(/\/$/, '')
+}
 
 export async function loadTeam(): Promise<TeamMember[]> {
   try {

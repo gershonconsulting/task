@@ -10,7 +10,7 @@ export async function GET() {
   const members = await loadTeam()
   // linkedinSub is an internal binding; expose only whether it exists.
   return NextResponse.json({
-    members: members.map(({ linkedinSub, ...m }) => ({ ...m, linkedinLinked: !!linkedinSub })),
+    members: members.map(({ linkedinSub, inviteToken: _t, ...m }) => ({ ...m, linkedinLinked: !!linkedinSub })),
   })
 }
 
@@ -37,6 +37,11 @@ export async function PUT(req: NextRequest) {
         linkedinEmail: (m.linkedinEmail ?? '').trim().toLowerCase() || undefined,
         linkedinSub: unlink ? undefined : prev?.linkedinSub,
         lastLogin: prev?.lastLogin,
+        picture: prev?.picture,
+        inviteToken: prev?.inviteToken,
+        invitedAt: prev?.invitedAt,
+        createdAt: prev?.createdAt,
+        createdBy: prev?.createdBy,
       }
     })
   if (!next.some(m => m.role === 'admin'))

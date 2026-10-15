@@ -1,4 +1,17 @@
 import Sidebar from './Sidebar'
+import { getIronSession } from 'iron-session'
+import { cookies } from 'next/headers'
+import { getSessionOptions, type SessionData } from '@/lib/session'
+import { isOwnerUser } from '@/lib/team'
+import { authEnforced } from '@/lib/site'
+
+async function ownerSignedIn(): Promise<boolean> {
+  try {
+    const s = await getIronSession<SessionData>(await cookies(), getSessionOptions())
+    if (s.user) return isOwnerUser(s.user)
+  } catch { /* no session */ }
+  return !authEnforced()
+}
 
 interface AppShellProps {
   children: React.ReactNode
@@ -14,10 +27,11 @@ function initials(name: string) {
 }
 
 /** Gershon.AI unified shell — white sidebar, sticky frosted topbar, content on #fafafa (Linalysis layout). */
-export default function AppShell({ children, userName, userRole, pageTitle, pageSubtitle, actions }: AppShellProps) {
+export default async function AppShell({ children, userName, userRole, pageTitle, pageSubtitle, actions }: AppShellProps) {
+  const isOwner = await ownerSignedIn()
   return (
     <div className="flex min-h-screen bg-[#fafafa]">
-      <Sidebar userName={userName} userRole={userRole} />
+      <Sidebar userName={userName} userRole={userRole} isOwner={isOwner} />
       <div className="flex-1 flex flex-col min-w-0">
         <header className="sticky top-0 z-30 h-16 bg-white/85 backdrop-blur-md border-b border-[#e5e7eb] flex items-center justify-between gap-4 pl-16 pr-4 md:px-7">
           <div className="min-w-0">

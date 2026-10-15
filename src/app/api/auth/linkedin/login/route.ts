@@ -19,6 +19,8 @@ export function GET(req: NextRequest) {
   const res = NextResponse.redirect(url.toString())
   const opts = { httpOnly: true, secure: true, sameSite: 'lax' as const, path: '/', maxAge: 600 }
   res.cookies.set('li_login_state', state, opts)
+  const invite = (req.nextUrl.searchParams.get('invite') || '').replace(/[^a-zA-Z0-9-]/g, '').slice(0, 64)
+  if (invite) res.cookies.set('li_invite', invite, opts)
   res.cookies.set('li_login_next', next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard', opts)
   return res
 }

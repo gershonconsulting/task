@@ -15,6 +15,7 @@ function fail(reason: string, detail?: string) {
   if (detail) u.searchParams.set('detail', detail.slice(0, 160))
   const res = NextResponse.redirect(u.toString())
   res.cookies.delete('li_login_state')
+  res.cookies.delete('li_invite')
   return res
 }
 
@@ -52,27 +53,36 @@ export async function GET(req: NextRequest) {
   const li = (await infoRes.json()) as LinkedInIdentity
   if (!li.sub) return fail('userinfo')
 
-  // 3. must be a registered member (Settings → Team members)
+  // 3. must be a registered member (Admin panel / Settings → Team members).
+  //    An invite link created in the Admin panel binds this LinkedIn account to
+  //    that member even when name and e-mail do not match.
   const team = await loadTeam()
-  const member = matchMember(team, li)
+  const invite = jar.get('li_invite')?.value
+  const invited = invite
+    ? team.find(m => m.inviteToken && m.inviteToken === invite && (!m.linkedinSub || m.linkedinSub === li.sub))
+    : undefined
+  const alreadyBound = team.find(m => m.linkedinSub === li.sub)
+  const member = (invited && (!alreadyBound || alreadyBound.id === invited.id) ? invited : null) ?? matchMember(team, li)
   if (!member) return fail('not_registered', li.name || li.email || '')
 
   // 4. bind this LinkedIn account to the member so the next sign-in is exact
   try {
     const now = new Date().toISOString()
     const updated = team.map(m => m.id === member.id
-      ? { ...m, linkedinSub: li.sub, linkedinEmail: m.linkedinEmail || li.email || undefined, lastLogin: now }
+      ? { ...m, linkedinSub: li.sub, linkedinEmail: m.linkedinEmail || li.email || undefined, lastLogin: now,
+          picture: li.picture || m.picture, inviteToken: undefined }
       : m)
     if (team.some(m => m.id === member.id)) await saveTeam(updated)
   } catch { /* sign-in still succeeds */ }
 
   const session = await getIronSession<SessionData>(jar, getSessionOptions())
-  session.user = { id: member.id, name: member.name, email: member.email, role: member.role, picture: li.picture }
+  session.user = { id: member.id, name: member.name, email: member.email, role: member.role, picture: li.picture, liEmail: li.email }
   await session.save()
 
   const next = jar.get('li_login_next')?.value || '/dashboard'
   const res = NextResponse.redirect(new URL(next, siteUrl()).toString())
   res.cookies.delete('li_login_state')
   res.cookies.delete('li_login_next')
+  res.cookies.delete('li_invite')
   return res
 }
