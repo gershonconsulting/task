@@ -61,6 +61,17 @@ CI            : .github/
   GC Task <reports@gershon.ai>, once per ET day. Test: run the workflow with
   input only=<address>. Test sent to oattia@gmail.com 2026-10-13 (delivered).
 
+3b. DONE — v1.2.0, 2026-10-15
+----------------------------------------------------------------
+- ✅ Admin · Users panel at /admin (owner only = OWNER_EMAILS incl. olivier@attia.com):
+  create users from a LinkedIn profile link (name auto-filled from the URL), role,
+  work e-mail; KPIs, search, edit, Reset LinkedIn, remove. API: /api/admin/users
+  (GET/POST/PATCH/DELETE), /api/admin/users/invite (POST {id, send, regenerate}).
+- ✅ One-time invite links /login?invite=<token> bind the first LinkedIn sign-in to
+  that user even if LinkedIn name/e-mail differ; optional invite e-mail via Resend
+  (GC Task <reports@gershon.ai>). LinkedIn photo saved at sign-in.
+- ✅ Olivier's LinkedIn sign-in on task.gershon.ai verified working (2026-10-15).
+
 4. PENDING  [TODO]
 ----------------------------------------------------------------
 - ✅ (2026-10-13) Attach task.gershon.ai — done via attach-domain.yml (Pages domain) + DNS CNAME task -> gershon-task.pages.dev added in the dashboard. Old note: Cloudflare -> Workers & Pages -> gershon-task ->
@@ -71,8 +82,8 @@ CI            : .github/
   workflow URLs + deploy.yml NEXT_PUBLIC_SITE_URL + wrangler.toml to
   task.gershon.ai, push. Old host keeps /api/* and 308-redirects pages.
   Playbook: gershonconsulting/social docs/DOMAIN-MOVE-PLAYBOOK.md
-- ❌ Olivier's first real LinkedIn sign-in (verified up to LinkedIn's
-  password page).
+- ✅ Olivier's first real LinkedIn sign-in (done, 2026-10-15).
+- ❌ Aina Rama, Juliana Ravao, Nicolette Jones: send invites from /admin (not sent yet).
 
 5. MISSING / NOT BUILT YET
 ----------------------------------------------------------------
@@ -95,8 +106,8 @@ CI            : .github/
   on things next build accepts (edge-runtime incompatibilities), and
   it is what actually runs in production. Skipping it ships a broken
   deploy that built cleanly locally.
-- Writes to this repo go through the GitHub web UI in Chrome; `git
-  push` is proxy-refused and the API 403s on write. Verify every
+- git push works from a cloud session after add_repo(access: push) (2026-10-15).
+  npm install needs --legacy-peer-deps locally. Verify every
   commit by reading raw.githubusercontent.com.
 
 9. CONTACT / ESCALATION
