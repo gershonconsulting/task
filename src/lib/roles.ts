@@ -8,7 +8,6 @@ export type UserRole =
 const TEAM_EMAILS = new Set<string>([
   'olivier@gershonconsulting.com',
   'olivier@attia.com',
-  'winnie.lauren@gershonconsulting.com',
   'aina.rama@gershonconsulting.com',
 ].map(e => e.toLowerCase()));
 

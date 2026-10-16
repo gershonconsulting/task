@@ -10,7 +10,7 @@ import TaskList from './TaskList'
 import { deleteProject } from './actions'
 import Link from 'next/link'
 
-const DEFAULT_TEAM = ['Olivier', 'Winnie Lauren', 'Aina Rama', 'Sai']
+const DEFAULT_TEAM = ['Olivier', 'Aina Rama', 'Sai']
 
 export default async function ProjectDetailPage(props: { params: Promise<{ id: string }> }) {
   const tplMap = await loadTemplateMap()
