@@ -5,21 +5,28 @@ import { supabaseAdmin } from '@/lib/supabaseServer'
 import { readEnv, siteUrl } from '@/lib/site'
 import { loadTeam, OWNER_EMAILS, type TeamMember } from '@/lib/team'
 import { etToday, loadMyWork, type MyWork, type WorkTask } from '@/lib/myWork'
+import { buildMasterReport, MASTER_TO } from '@/lib/masterReport'
 
 /**
- * Friday report — every registered user of the platform (Settings → Team
- * members) gets their own e-mail every Friday: what they finished this week,
- * what is late, what is due next week, plus the team table.
+ * Friday reports (v1.3.0):
+ *   1. "My Tasks" report — every registered user (Settings → Team members)
+ *      gets their own e-mail with their My Tasks stats: late, due today,
+ *      next 7 days, later, no date, done this week, + the task lists.
+ *   2. Weekly MASTER report — the whole team / all clients on one page,
+ *      sent to report@gershonconsulting.com.
  *
- *   POST                       send to every member (once per New-York day)
+ *   POST                       send every member report + the master (once per New-York day each)
  *   POST ?only=<email>         send just one member's report to that address (test)
+ *   POST ?master=1[&only=<email>]  send only the master report (to MASTER_TO, or to `only` as a test)
  *   POST ?force=1              send again even if today's run already went out
- *   GET  ?preview=1[&member=<id>]   render the HTML, send nothing
+ *   GET  ?preview=1[&member=<id>]   render a member's HTML, send nothing
+ *   GET  ?preview=1&master=1        render the master HTML, send nothing
  * All need  Authorization: Bearer <CRON_SECRET>.
  * Scheduled by .github/workflows/weekly-report.yml — Fridays 12:00 UTC (08:00 ET).
  */
 const FROM = 'GC Task <reports@gershon.ai>'   // gershon.ai is the verified Resend domain
 const STATE_KEY = 'friday_report_state'
+const MASTER_STATE_KEY = 'master_report_state'
 
 function esc(s: unknown): string { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!)) }
 function fmt(d: string): string { return new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }) }
@@ -48,11 +55,15 @@ function buildEmail(m: TeamMember, w: MyWork): { subject: string; html: string }
   const status = late.length
     ? `<strong style="color:#FE1B04;">${late.length} late</strong> — please close or re-date them before Monday.`
     : next.length ? `Nothing late. <strong>${next.length}</strong> due next week.` : 'Nothing late and nothing due next week.'
-  const subject = `GC Task · Your week — ${w.doneLast7.length} done, ${late.length} late, ${next.length} next week`
-  const dash = siteUrl() + '/dashboard'
+  const subject = `GC Task · My Tasks — ${w.doneLast7.length} done, ${late.length} late, ${next.length} next week`
+  const dash = siteUrl() + '/tasks'
   const box = (title: string, body: string, accent = '#e5e7eb') =>
     `<div style="background:#fff;border:1px solid #e5e7eb;border-left:4px solid ${accent};border-radius:12px;padding:16px 18px;margin:0 0 14px;"><div style="font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#6e6e73;margin-bottom:4px;">${title}</div>${body}</div>`
-  const team = w.team.map(t => `<tr><td style="padding:6px 0;border-bottom:1px solid #f0f0f2;font-size:13px;">${esc(t.member.name)}</td><td style="padding:6px 8px;border-bottom:1px solid #f0f0f2;font-size:13px;text-align:right;color:#057642;">${t.doneLast7}</td><td style="padding:6px 8px;border-bottom:1px solid #f0f0f2;font-size:13px;text-align:right;${t.overdue ? 'color:#FE1B04;font-weight:700;' : 'color:#6e6e73;'}">${t.overdue}</td><td style="padding:6px 0 6px 8px;border-bottom:1px solid #f0f0f2;font-size:13px;text-align:right;">${t.open}</td></tr>`).join('')
+  const openCount = late.length + w.dueToday.length + w.thisWeek.length + w.later.length + w.noDate.length
+  const closedPct = openCount + w.doneLast7.length ? Math.round(w.doneLast7.length / (openCount + w.doneLast7.length) * 100) : 0
+  const stat = (label: string, val: number | string, color = '#1d1d1f') =>
+    `<td style="width:14.2%;padding:10px 2px;text-align:center;background:#fff;border:1px solid #e5e7eb;border-radius:10px;"><div style="font-size:20px;font-weight:800;color:${color};">${val}</div><div style="font-size:10px;color:#6e6e73;">${label}</div></td>`
+  const stats = `<table role="presentation" style="width:100%;border-collapse:separate;border-spacing:5px;margin:0 -5px 12px;"><tr>${stat('Late', late.length, late.length ? '#FE1B04' : '#1d1d1f')}${stat('Due today', w.dueToday.length, w.dueToday.length ? '#b45309' : '#1d1d1f')}${stat('Next 7 days', w.thisWeek.length)}${stat('Later', w.later.length)}${stat('No date', w.noDate.length, w.noDate.length ? '#6e6e73' : '#1d1d1f')}${stat('Done this week', w.doneLast7.length, '#057642')}${stat('Closed %', closedPct + '%')}</tr></table>`
 
   const html = `<!doctype html><html><body style="margin:0;background:#fafafa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1d1d1f;">
 <div style="max-width:620px;margin:0 auto;padding:24px 16px;">
@@ -61,13 +72,14 @@ function buildEmail(m: TeamMember, w: MyWork): { subject: string; html: string }
     <span style="font-size:18px;font-weight:800;color:#FE1B04;margin-left:10px;">Task</span><span style="font-size:12px;font-weight:600;color:#6e6e73;margin-left:6px;">by Gershon.AI</span>
   </div>
   <h1 style="font-size:22px;margin:0 0 4px;">${esc(first)}, here is your week</h1>
-  <p style="margin:0 0 16px;color:#6e6e73;font-size:13px;">Week ending ${fmt(w.today)} · ${status}</p>
+  <p style="margin:0 0 12px;color:#6e6e73;font-size:13px;">Week ending ${fmt(w.today)} · ${status}</p>
+  <div style="font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#6e6e73;margin:0 0 2px;">My Tasks — ${openCount} open</div>
+  ${stats}
   ${box(`Late (${late.length})`, taskRows(late, 'late'), late.length ? '#FE1B04' : '#e5e7eb')}
   ${box(`Due next week (${next.length})`, taskRows(next, 'next'))}
   ${box(`Done this week (${w.doneLast7.length})`, taskRows(w.doneLast7, 'done', 8), '#057642')}
-  ${box('Team this week', `<table role="presentation" style="width:100%;border-collapse:collapse;"><tr style="font-size:11px;color:#6e6e73;text-transform:uppercase;"><td style="padding:4px 0;">Member</td><td style="padding:4px 8px;text-align:right;">Done</td><td style="padding:4px 8px;text-align:right;">Late</td><td style="padding:4px 0 4px 8px;text-align:right;">Open</td></tr>${team}</table>`)}
-  <div style="text-align:center;margin:22px 0 8px;"><a href="${dash}" style="display:inline-block;background:#FE1B04;color:#fff;font-weight:700;font-size:14px;text-decoration:none;padding:12px 22px;border-radius:8px;">Open my dashboard →</a></div>
-  <p style="text-align:center;font-size:11px;color:#6e6e73;margin-top:18px;">Sent every Friday to each member registered in Task (Settings → Team members). · <a href="${siteUrl()}" style="color:#6e6e73;">${siteUrl().replace('https://', '')}</a></p>
+  <div style="text-align:center;margin:22px 0 8px;"><a href="${dash}" style="display:inline-block;background:#FE1B04;color:#fff;font-weight:700;font-size:14px;text-decoration:none;padding:12px 22px;border-radius:8px;">Open My Tasks →</a></div>
+  <p style="text-align:center;font-size:11px;color:#6e6e73;margin-top:18px;">Your My Tasks report — sent every Friday to each member registered in Task (Settings → Team members). · <a href="${siteUrl()}" style="color:#6e6e73;">${siteUrl().replace('https://', '')}</a></p>
 </div></body></html>`
   return { subject, html }
 }
@@ -85,6 +97,11 @@ async function sendOne(key: string, to: string, subject: string, html: string) {
 export async function GET(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const team = await loadTeam()
+  if (req.nextUrl.searchParams.get('master')) {
+    const { subject, html } = await buildMasterReport(team)
+    if (req.nextUrl.searchParams.get('preview')) return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'x-subject': encodeURIComponent(subject) } })
+    return NextResponse.json({ to: MASTER_TO, subject })
+  }
   const id = req.nextUrl.searchParams.get('member')
   const m = team.find(t => t.id === id) ?? team[0]
   const { subject, html } = buildEmail(m, await loadMyWork(m))
@@ -100,8 +117,33 @@ export async function POST(req: NextRequest) {
   const team = await loadTeam()
   const today = etToday()
 
-  // Test: one report to one address (must be a member or the owner).
   const only = (sp.get('only') || '').toLowerCase().trim()
+  const supa = supabaseAdmin()
+
+  const sendMaster = async (to: string, test: boolean) => {
+    const { subject, html } = await buildMasterReport(team)
+    return { report: 'master', to, ...(await sendOne(key, to, (test ? '[test] ' : '') + subject, html)) }
+  }
+  const masterDue = async () => {
+    const { data } = await supa.from('app_settings').select('value').eq('key', MASTER_STATE_KEY).maybeSingle()
+    return (data?.value ? (JSON.parse(data.value) as { date?: string }).date : undefined) !== today || !!sp.get('force')
+  }
+  const markMaster = () => supa.from('app_settings').upsert({ key: MASTER_STATE_KEY, value: JSON.stringify({ date: today, to: MASTER_TO, at: new Date().toISOString() }) }, { onConflict: 'key' })
+
+  // Master only (test to `only`, or the real one to the report mailbox).
+  if (sp.get('master')) {
+    if (only) {
+      if (!(team.some(t => t.email.toLowerCase() === only) || OWNER_EMAILS.includes(only) || only === MASTER_TO)) return NextResponse.json({ error: 'only= must be a member, the owner or the report mailbox' }, { status: 400 })
+      const r = await sendMaster(only, true)
+      return NextResponse.json({ test: true, ...r }, { status: r.ok ? 200 : 502 })
+    }
+    if (!(await masterDue())) return NextResponse.json({ ok: true, skipped: 'master already sent today', date: today })
+    const r = await sendMaster(MASTER_TO, false)
+    if (r.ok) await markMaster()
+    return NextResponse.json({ date: today, ...r }, { status: r.ok ? 200 : 502 })
+  }
+
+  // Test: one report to one address (must be a member or the owner).
   if (only) {
     const allowed = team.some(t => t.email.toLowerCase() === only) || OWNER_EMAILS.includes(only)
     if (!allowed) return NextResponse.json({ error: 'only= must be a registered member or the owner' }, { status: 400 })
@@ -111,18 +153,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ test: true, to: only, member: m.name, ...r }, { status: r.ok ? 200 : 502 })
   }
 
-  const supa = supabaseAdmin()
   const { data: st } = await supa.from('app_settings').select('value').eq('key', STATE_KEY).maybeSingle()
   const last = st?.value ? (JSON.parse(st.value) as { date?: string }).date : undefined
-  if (last === today && !sp.get('force')) return NextResponse.json({ ok: true, skipped: 'already sent today', date: today })
+  const membersDue = last !== today || !!sp.get('force')
 
-  const results = []
-  for (const m of team) {
+  const results: { member?: string; report?: string; to?: string; ok: boolean; id?: string; error?: unknown }[] = []
+  for (const m of membersDue ? team : []) {
     if (!m.email) { results.push({ member: m.name, ok: false, error: 'no email' }); continue }
     const { subject, html } = buildEmail(m, await loadMyWork(m))
     results.push({ member: m.name, to: m.email, ...(await sendOne(key, m.email, subject, html)) })
   }
   const sent = results.filter(r => r.ok).length
   if (sent) await supa.from('app_settings').upsert({ key: STATE_KEY, value: JSON.stringify({ date: today, sent, at: new Date().toISOString() }) }, { onConflict: 'key' })
-  return NextResponse.json({ ok: sent === results.length, date: today, sent, results }, { status: sent ? 200 : 502 })
+
+  // Weekly master report → report@gershonconsulting.com
+  let master: (typeof results)[number] | { skipped: string } = { skipped: 'master already sent today' }
+  if (await masterDue()) {
+    const r = await sendMaster(MASTER_TO, false)
+    if (r.ok) await markMaster()
+    results.push(r); master = r
+  }
+  if (!membersDue && !results.length) return NextResponse.json({ ok: true, skipped: 'already sent today', date: today })
+  const okAll = results.every(r => r.ok)
+  return NextResponse.json({ ok: okAll, date: today, sent: results.filter(r => r.ok).length, master, results }, { status: results.some(r => r.ok) ? 200 : 502 })
 }

@@ -1,7 +1,9 @@
 name: Friday Report
 
-# Every Friday at 12:00 UTC (08:00 ET) each member registered in Task
-# (Settings → Team members) receives their own weekly report by e-mail.
+# Every Friday at 12:00 UTC (08:00 ET):
+#   - each member registered in Task (Settings → Team members) receives their
+#     own "My Tasks" report, and
+#   - the weekly MASTER report goes to report@gershonconsulting.com.
 # The endpoint sends once per New-York day, so a retry cannot double-send.
 # Run it on demand from Actions → Friday Report → Run workflow.
 # Optional input "only": send ONE test report to that address (a member or the owner).
@@ -14,6 +16,11 @@ on:
         description: 'Test: send one report to this address only (leave empty to send to the whole team)'
         required: false
         default: ''
+      master:
+        description: 'Send ONLY the master report (to report@gershonconsulting.com, or to "only" as a test)'
+        type: boolean
+        required: false
+        default: false
       member:
         description: 'Test: whose report to render (member id from Settings, e.g. olivier, aina)'
         required: false
@@ -27,9 +34,13 @@ jobs:
         env:
           ONLY: ${{ github.event.inputs.only }}
           MEMBER: ${{ github.event.inputs.member }}
+          MASTER: ${{ github.event.inputs.master }}
         run: |
           URL="https://task.gershon.ai/api/cron/weekly-report"
-          if [ -n "$ONLY" ]; then URL="$URL?only=$(printf '%s' "$ONLY" | jq -sRr @uri)&member=$(printf '%s' "$MEMBER" | jq -sRr @uri)"; fi
+          Q=""
+          if [ "$MASTER" = "true" ]; then Q="master=1"; fi
+          if [ -n "$ONLY" ]; then Q="${Q:+$Q&}only=$(printf '%s' "$ONLY" | jq -sRr @uri)&member=$(printf '%s' "$MEMBER" | jq -sRr @uri)"; fi
+          if [ -n "$Q" ]; then URL="$URL?$Q"; fi
           code=$(curl -sS -o /tmp/out.json -w '%{http_code}' -X POST "$URL" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
           echo "HTTP $code"; cat /tmp/out.json; echo
