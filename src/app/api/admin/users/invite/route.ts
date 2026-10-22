@@ -37,8 +37,8 @@ export async function POST(req: NextRequest) {
     const first = esc(m.name.split(' ')[0])
     const html = `<!doctype html><html><body style="margin:0;background:#fafafa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1d1d1f;">
 <div style="max-width:560px;margin:0 auto;padding:28px 16px;">
-  <div style="margin-bottom:18px;"><span style="display:inline-block;width:28px;height:28px;border-radius:7px;background:#FE1B04;color:#fff;text-align:center;line-height:28px;font-weight:900;">✓</span>
-  <span style="font-weight:800;font-size:18px;color:#FE1B04;vertical-align:middle;margin-left:8px;">Task</span> <span style="color:#6e6e73;font-size:13px;vertical-align:middle;">by Gershon.AI</span></div>
+  <div style="margin-bottom:18px;"><span style="display:inline-block;width:28px;height:28px;border-radius:7px;background:#CC3333;color:#fff;text-align:center;line-height:28px;font-weight:900;">✓</span>
+  <span style="font-weight:800;font-size:18px;color:#CC3333;vertical-align:middle;margin-left:8px;">Task</span> <span style="color:#6e6e73;font-size:13px;vertical-align:middle;">by Gershon.AI</span></div>
   <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:24px;">
     <h1 style="margin:0 0 10px;font-size:20px;">Hi ${first}, your access is ready</h1>
     <p style="margin:0 0 18px;font-size:15px;line-height:1.5;color:#3a3a3c;">Olivier Attia added you to <strong>Task by Gershon.AI</strong>, the Gershon Consulting task platform. Sign in once with your LinkedIn account through the button below — after that, the normal “Sign in with LinkedIn” button works.</p>
