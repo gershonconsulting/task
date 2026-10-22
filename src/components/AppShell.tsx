@@ -26,14 +26,14 @@ function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]!.toUpperCase()).join('') || '?'
 }
 
-/** Gershon.AI unified shell — white sidebar, sticky frosted topbar, content on #fafafa (Linalysis layout). */
+/** Gershon unified shell — white 240px sidebar, sticky white page header, content on #fafafa (Linalysis layout, red #CC3333). */
 export default async function AppShell({ children, userName, userRole, pageTitle, pageSubtitle, actions }: AppShellProps) {
   const isOwner = await ownerSignedIn()
   return (
     <div className="flex min-h-screen bg-[#fafafa]">
       <Sidebar userName={userName} userRole={userRole} isOwner={isOwner} />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-30 h-16 bg-white/85 backdrop-blur-md border-b border-[#e5e7eb] flex items-center justify-between gap-4 pl-16 pr-4 md:px-7">
+        <header className="gx-topbar sticky top-0 z-30 h-16 bg-white border-b border-[#e5e7eb] flex items-center justify-between gap-3 pl-16 pr-4 md:px-7">
           <div className="min-w-0">
             <h1 className="text-[18px] font-bold tracking-tight truncate">{pageTitle}</h1>
             {pageSubtitle && <p className="text-[12px] text-[#6e6e73] truncate -mt-0.5">{pageSubtitle}</p>}

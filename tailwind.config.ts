@@ -1,22 +1,24 @@
 import type { Config } from 'tailwindcss'
 
 /**
- * Gershon.AI unified look (2026-10-13): Linalysis layout, Gershon.ai red as the
- * main colour. `brand` is the canonical name; `indigo` is remapped to the same
- * red scale so every older indigo accent in the app turns Gershon red at once.
+ * Gershon unified design (decision 2026-10-13, re-based 2026-10-22, v1.4.0):
+ * Linalysis layout, Gershon.ai red #CC3333 as the main colour (same tokens as
+ * Radar / Pulse unified-theme.css). `brand` is the canonical name; `indigo` is
+ * remapped to the same red scale so every older indigo accent turns Gershon red.
+ * 600 = brand #CC3333, 700 = dark #a8281f, 50 = tint #fdf2f2.
  */
 const brand = {
-  50: '#fff5f5',
-  100: '#ffe4e1',
-  200: '#ffc9c2',
-  300: '#ff9f93',
-  400: '#ff6a58',
-  500: '#ff3b24',
-  600: '#FE1B04',
-  700: '#d11200',
-  800: '#a80f02',
-  900: '#7a0d03',
-  950: '#450600',
+  50: '#fdf2f2',
+  100: '#fbe3e3',
+  200: '#f3caca',
+  300: '#e9a3a3',
+  400: '#dc6b6b',
+  500: '#d24545',
+  600: '#CC3333',
+  700: '#a8281f',
+  800: '#87211a',
+  900: '#6b1b16',
+  950: '#3d0d0a',
 }
 
 const config: Config = {

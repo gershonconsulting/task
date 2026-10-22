@@ -1,0 +1,54 @@
+/* =====================================================================
+   Task - unified Gershon design (v1.4.0, 2026-10-22)
+   Decision 2026-10-13: every Gershon app looks like Linalysis (the master
+   design) and the main colour everywhere is the Gershon.ai red #CC3333.
+   Same token names as Radar / Pulse unified-theme.css. Imported LAST in
+   src/app/layout.tsx so it overrides globals.css and Tailwind utilities.
+   The Tailwind `brand` (and remapped `indigo`) scale carries the red into
+   the markup; this file adds what utilities cannot express globally:
+   red focus rings, form accent colour, flat white page headers and the
+   phone horizontal-scroll guard.
+   Status colours (green done, amber in progress / due today, red overdue,
+   slate not started) are deliberately NOT touched.
+   ===================================================================== */
+
+html:root{
+  --gx-red:#CC3333; --gx-red-dark:#a8281f; --gx-red-light:#fdf2f2; --gx-red-line:#f3caca;
+  --gx-text:#1d1d1f; --gx-muted:#6e6e73; --gx-border:#e5e7eb; --gx-bg:#fafafa; --gx-radius:12px;
+  --gx-ring:0 0 0 3px rgba(204,51,51,.15);
+
+  /* globals.css tokens */
+  --brand:var(--gx-red); --brand-dark:var(--gx-red-dark); --brand-light:var(--gx-red-light);
+  --text:var(--gx-text); --text-muted:var(--gx-muted); --border:var(--gx-border); --bg:var(--gx-bg);
+}
+html body{ background:var(--gx-bg); color:var(--gx-text); }
+
+/* ---------- Inputs: red focus ring everywhere (incl. old slate/indigo forms) ---------- */
+input:not([type=checkbox]):not([type=radio]):focus,
+select:focus,
+textarea:focus{
+  outline:none; border-color:var(--gx-red) !important; box-shadow:var(--gx-ring) !important;
+}
+input[type=checkbox], input[type=radio], input[type=range], progress{ accent-color:var(--gx-red); }
+a:focus-visible, button:focus-visible, summary:focus-visible{
+  outline:2px solid var(--gx-red); outline-offset:2px; border-radius:8px;
+}
+::selection{ background:var(--gx-red-line); color:var(--gx-text); }
+
+/* ---------- Brand mark: old #FE1B04 logo squares (Sidebar, project report) ---------- */
+svg rect[fill="#FE1B04"], svg rect[fill="#fe1b04"]{ fill:var(--gx-red); }
+svg path[stroke="#FE1B04"]{ stroke:var(--gx-red); }
+.accent-\[\#FE1B04\]{ accent-color:var(--gx-red); }
+
+/* ---------- Header / page header: flat white (was frosted / tinted gradient) ---------- */
+.gx-topbar{ background:#fff; }
+.gx-page-head{ background:#fff; }
+
+/* ---------- Phone: no sideways page scroll ---------- */
+/* overflow-x:clip (not hidden) so position:sticky keeps working; wide boards
+   and tables scroll inside their own overflow-x:auto boxes. */
+html, body{ max-width:100%; overflow-x:clip; }
+@media (max-width:767px){
+  /* clear of the fixed ☰ button (40px at left 12px) */
+  .gx-topbar{ padding-left:64px; }
+}
