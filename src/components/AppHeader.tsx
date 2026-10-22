@@ -9,10 +9,10 @@ interface AppHeaderProps {
   user?: { name: string; role: string }
 }
 
-/** Page header in the Gershon.AI / Linalysis style: white card, red left rule, red primary buttons. */
+/** Page header in the Gershon unified / Linalysis style: white card, red primary buttons. */
 export default function AppHeader({ title, subtitle, back, actions = [] }: AppHeaderProps) {
   return (
-    <header className="bg-gradient-to-br from-brand-50 to-white border border-[#e5e7eb] border-l-4 border-l-brand-600 rounded-xl px-5 py-4 mb-6">
+    <header className="gx-page-head bg-white border border-[#e5e7eb] rounded-xl px-5 py-4 mb-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="min-w-0">
           {back && (

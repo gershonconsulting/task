@@ -2,11 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Gershon.AI unified look — mirrors Linalysis common.css */
+/* Gershon unified look (v1.4.0) — mirrors Linalysis common.css; overrides in unified-theme.css */
 :root {
-  --brand: #FE1B04;
-  --brand-dark: #d11200;
-  --brand-light: #fff5f5;
+  --brand: #CC3333;
+  --brand-dark: #a8281f;
+  --brand-light: #fdf2f2;
   --text: #1d1d1f;
   --text-muted: #6e6e73;
   --border: #e5e7eb;

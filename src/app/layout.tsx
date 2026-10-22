@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
+// Unified Gershon design override layer — loaded LAST so it wins (same approach as Radar / Pulse).
+import './unified-theme.css'
 
 export const metadata: Metadata = {
   title: 'Task by Gershon.AI',

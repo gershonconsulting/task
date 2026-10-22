@@ -27,7 +27,7 @@ export default function ClientPortal({ user, project, tasks, template }: Props) 
   const done = tasks.filter(t => t.status === 'completed').length
   const total = tasks.length
   const pct = total === 0 ? 0 : Math.round((done / total) * 100)
-  const accent = template?.color ?? '#6366f1'
+  const accent = template?.color ?? '#CC3333'
 
   async function handlePwSave(e: React.FormEvent) {
     e.preventDefault()
@@ -47,19 +47,19 @@ export default function ClientPortal({ user, project, tasks, template }: Props) 
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      <header className="bg-gradient-to-r from-brand-600 to-brand-700 text-white px-6 py-5 flex items-center justify-between">
+    <div className="min-h-screen bg-[#fafafa] text-[#1d1d1f]">
+      <header className="bg-white border-b border-[#e5e7eb] px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
         <div>
-          <div className="text-xs font-bold uppercase tracking-widest text-white/80 mb-0.5">Task by Gershon.AI</div>
+          <div className="text-xs font-bold uppercase tracking-widest text-brand-600 mb-0.5">Task by Gershon.AI</div>
           <h1 className="text-xl font-bold">{project?.company_name ?? 'My Project'}</h1>
-          {template && <p className="text-white/80 text-sm">{template.icon} {template.label}</p>}
+          {template && <p className="text-[#6e6e73] text-sm">{template.icon} {template.label}</p>}
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right hidden sm:block">
             <div className="text-sm font-semibold">{user.name || user.email}</div>
-            <div className="text-xs text-white/80">{user.email}</div>
+            <div className="text-xs text-[#6e6e73]">{user.email}</div>
           </div>
-          <button onClick={handleLogout} className="text-xs text-white/80 hover:text-white border border-white/50 px-3 py-1.5 rounded-md transition">Log out</button>
+          <button onClick={handleLogout} className="shrink-0 text-xs font-semibold text-[#1d1d1f] bg-white border border-[#e5e7eb] hover:border-brand-600 hover:text-brand-600 px-3 py-1.5 rounded-lg transition">Log out</button>
         </div>
       </header>
 
