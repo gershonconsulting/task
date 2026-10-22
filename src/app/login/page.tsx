@@ -50,25 +50,27 @@ function LoginInner() {
   }
 
   return (
-    <div className="min-h-screen grid md:grid-cols-2 bg-[#fafafa]">
-      {/* brand panel */}
-      <div className="hidden md:flex flex-col justify-between bg-brand-600 text-white p-12">
+    <div className="min-h-screen flex flex-col bg-[#fafafa]">
+    <div className="flex-1 grid md:grid-cols-2">
+      {/* brand panel — light, Linalysis-style (unified Gershon design, v1.4.0) */}
+      <div className="hidden md:flex flex-col justify-between bg-gradient-to-b from-white via-[#fafafa] to-brand-50 border-r border-[#e5e7eb] p-12">
         <div className="flex items-center gap-3">
-          <svg viewBox="0 0 64 64" width="36" height="36"><rect width="64" height="64" rx="14" fill="#fff" /><path d="M18 33l9 9 19-20" fill="none" stroke="#FE1B04" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          <span className="text-2xl font-extrabold tracking-tight">Task <span className="font-semibold opacity-80">by Gershon.AI</span></span>
+          <svg viewBox="0 0 64 64" width="36" height="36"><rect width="64" height="64" rx="14" fill="#CC3333" /><path d="M18 33l9 9 19-20" fill="none" stroke="#fff" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <span className="text-2xl font-extrabold tracking-tight text-brand-600">Task <span className="font-semibold text-[#6e6e73] text-lg">by Gershon.AI</span></span>
         </div>
         <div>
-          <h2 className="text-4xl font-extrabold tracking-tight leading-tight">Know exactly what<br />you have to do today.</h2>
-          <p className="mt-4 text-white/85 max-w-md">Every client, every project, every task of the Gershon Consulting team — with what is late and what is next at the top.</p>
+          <span className="inline-block text-[12px] font-bold text-brand-600 bg-brand-50 border border-brand-200 rounded-full px-3 py-1">Gershon Consulting team workspace</span>
+          <h2 className="mt-4 text-4xl font-extrabold tracking-tight leading-tight text-[#1d1d1f]">Know exactly what<br />you have to do <span className="text-brand-600">today.</span></h2>
+          <p className="mt-4 text-[#6e6e73] max-w-md">Every client, every project, every task of the Gershon Consulting team — with what is late and what is next at the top.</p>
         </div>
-        <p className="text-xs text-white/70">gershon.ai</p>
+        <p className="text-xs text-[#6e6e73]">gershon.ai</p>
       </div>
 
       {/* sign-in */}
       <div className="flex flex-col items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
           <div className="md:hidden flex items-center gap-2.5 mb-8">
-            <svg viewBox="0 0 64 64" width="32" height="32"><rect width="64" height="64" rx="14" fill="#FE1B04" /><path d="M18 33l9 9 19-20" fill="none" stroke="#fff" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <svg viewBox="0 0 64 64" width="32" height="32"><rect width="64" height="64" rx="14" fill="#CC3333" /><path d="M18 33l9 9 19-20" fill="none" stroke="#fff" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" /></svg>
             <span className="text-xl font-extrabold text-brand-600">Task <span className="text-[#6e6e73] font-semibold text-base">by Gershon.AI</span></span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Sign in</h1>
@@ -91,7 +93,7 @@ function LoginInner() {
 
           <a
             href={'/api/auth/linkedin/login?next=' + encodeURIComponent(next) + (invite ? '&invite=' + invite : '')}
-            className="w-full inline-flex items-center justify-center gap-3 rounded-lg bg-[#0a66c2] hover:bg-[#004182] text-white font-semibold text-[15px] py-3 shadow-sm transition-colors"
+            className="w-full inline-flex items-center justify-center gap-3 rounded-lg bg-brand-600 hover:bg-brand-700 text-white font-semibold text-[15px] py-3 shadow-sm transition-colors"
           >
             <LinkedInLogo /> Sign in with LinkedIn
           </a>
@@ -122,6 +124,12 @@ function LoginInner() {
           <p className="mt-10 text-[11px] text-[#6e6e73]">Task by Gershon.AI · v{pkg.version}</p>
         </div>
       </div>
+    </div>
+      {/* closing band — solid Gershon red, like Linalysis' cta-section */}
+      <footer className="bg-gradient-to-br from-brand-600 to-brand-700 text-white px-6 py-5 flex flex-wrap items-center justify-between gap-2 text-[13px]">
+        <span className="font-semibold">Late first, next step always named — one client, one column.</span>
+        <span className="text-white/85">Task by Gershon.AI · gershon.ai</span>
+      </footer>
     </div>
   )
 }
