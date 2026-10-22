@@ -1,7 +1,7 @@
 ================================================================
 HANDOFF.txt  -  task
 Written by: Claude (Anthropic) - token-limit handoff protocol
-Date: 2026-09-09 (section 3-7 refreshed 2026-10-13, v1.0.0)
+Date: 2026-09-09 (refreshed 2026-10-13 v1.0.0; 2026-10-22 v1.4.0 nightly)
 ================================================================
 
 0. WHO YOU ARE READING THIS
@@ -40,8 +40,36 @@ Hosting       : Cloudflare Pages via @cloudflare/next-on-pages
                 (wrangler.toml at root)
 Env           : copy .env.local.example - real values in 1Password
 Default branch: main
-Version       : 0.6.0
+Version       : 1.4.0 (package.json; shown in sidebar footer, page headers, sign-in page)
 CI            : .github/
+
+3z. v1.4.0, 2026-10-22 nightly  [IN PR - not merged]
+----------------------------------------------------------------
+Branch nightly/2026-10-22-task-unified-design (from main).
+Unified Gershon design (Olivier 2026-10-13: Linalysis layout is the
+master, Gershon.ai red everywhere; Radar v1.15.0 merged, Pulse PR #1).
+- ✅ Brand red #FE1B04 -> #CC3333 (dark #a8281f, tint #fdf2f2) via the
+  Tailwind `brand` scale (indigo is remapped to it) + globals.css tokens
+  + the hard-coded UI literals (logo mark, favicon, sign-in page,
+  project status report page). Admin checkbox gets red via the theme.
+- ✅ New src/app/unified-theme.css (imported in layout.tsx): tokens,
+  red focus rings on every field/link/button, red checkbox accent,
+  phone horizontal-scroll guard (overflow-x: clip, main min-width 0).
+- ✅ Page header card white (was red-tint gradient); sign-in page light
+  brand panel + white 12px sign-in card (was solid red half); client portal
+  header white on light page (was red gradient on blue).
+- ✅ Phone width: dashboard "Workload by person" row (150+190px fixed
+  columns) overflowed a 390px screen -> stacks on phones; progress rows
+  narrower on phones; mobile drawer 240px.
+- Status colours untouched: green done, amber today/in progress, red-*
+  overdue, slate not started; dashboard totals stay neutral #1d1d1f.
+- ✅ Checks run locally 2026-10-22: tsc --noEmit, next build,
+  @cloudflare/next-on-pages all pass. /login rendered with next start
+  + Chromium at 1366px and 390px: no horizontal scroll.
+- PR: github.com/gershonconsulting/task/pull/2
+- Preview: no branch preview for Task (deploys from main only) -> private
+  Claude artifact "Task Unified Design" (sample data, branch's real CSS):
+  claude.ai/artifact/9oZptrSwG9L62stJm9J1KS
 
 3a. v1.3.0, 2026-10-18  [DONE]
 ----------------------------------------------------------------
@@ -87,6 +115,14 @@ CI            : .github/
 
 4. PENDING  [TODO]
 ----------------------------------------------------------------
+- ❌ Merge PR #2 nightly/2026-10-22-task-unified-design (v1.4.0) -
+  Olivier's call; merge = live on task.gershon.ai ~90 s later.
+- ❌ E-mails still use the old red #FE1B04 (left out of this PR on
+  purpose to keep the diff UI-only): src/lib/masterReport.ts,
+  src/app/api/cron/weekly-report/route.ts, api/admin/users/invite -
+  find/replace #FE1B04 -> #CC3333 in a follow-up.
+- ❌ Inner pages still use some slate-* greys (By Client board, settings
+  editors): readable and on-palette, but could move to #6e6e73/#e5e7eb.
 - ✅ (2026-10-13) Attach task.gershon.ai — done via attach-domain.yml (Pages domain) + DNS CNAME task -> gershon-task.pages.dev added in the dashboard. Old note: Cloudflare -> Workers & Pages -> gershon-task ->
   Custom domains -> add task.gershon.ai (dashboard froze for Claude; API route
   is not allowed). LinkedIn return URL for task.gershon.ai is ALREADY
@@ -110,7 +146,8 @@ CI            : .github/
 
 7. NEXT ACTION - START HERE
 ----------------------------------------------------------------
-  -> Domain move done. Next: Olivier's first LinkedIn sign-in on task.gershon.ai.
+  -> Review + merge the v1.4.0 unified-design PR (preview = artifact link
+     in the PR). Then send the pending /admin invites (section 4).
 
 8. GOTCHAS / HARD-WON LESSONS
 ----------------------------------------------------------------
@@ -119,6 +156,9 @@ CI            : .github/
   on things next build accepts (edge-runtime incompatibilities), and
   it is what actually runs in production. Skipping it ships a broken
   deploy that built cleanly locally.
+- `next build` needs `wrangler` installed (next.config.mjs imports
+  @cloudflare/next-on-pages/next-dev): locally run
+  `npm install --no-save wrangler@3` first (CI's npx pulls it).
 - git push works from a cloud session after add_repo(access: push) (2026-10-15).
   npm install needs --legacy-peer-deps locally. Verify every
   commit by reading raw.githubusercontent.com.
