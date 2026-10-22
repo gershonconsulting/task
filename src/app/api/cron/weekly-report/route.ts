@@ -39,7 +39,7 @@ function authorized(req: NextRequest): boolean {
 function taskRows(ts: WorkTask[], kind: 'late' | 'next' | 'done', max = 12): string {
   if (!ts.length) return `<p style="margin:6px 0 0;color:#6e6e73;font-size:13px;">${kind === 'late' ? 'Nothing late. 👏' : kind === 'next' ? 'Nothing due next week.' : 'No task closed this week.'}</p>`
   const rows = ts.slice(0, max).map(t => {
-    const right = kind === 'late' ? `<span style="color:#FE1B04;font-weight:700;">${t.daysLate}d late</span>`
+    const right = kind === 'late' ? `<span style="color:#CC3333;font-weight:700;">${t.daysLate}d late</span>`
       : kind === 'next' ? `<span style="color:#6e6e73;">${t.dueDate ? fmt(t.dueDate) : ''}</span>`
       : `<span style="color:#057642;">✓ done</span>`
     return `<tr><td style="padding:8px 0;border-bottom:1px solid #f0f0f2;font-size:14px;color:#1d1d1f;">${esc(t.name)}<div style="font-size:12px;color:#6e6e73;">${esc(t.projectLabel)}</div></td><td style="padding:8px 0 8px 12px;border-bottom:1px solid #f0f0f2;font-size:12px;text-align:right;white-space:nowrap;">${right}</td></tr>`
@@ -53,7 +53,7 @@ function buildEmail(m: TeamMember, w: MyWork): { subject: string; html: string }
   const next = [...w.dueToday, ...w.thisWeek]
   const late = w.overdue
   const status = late.length
-    ? `<strong style="color:#FE1B04;">${late.length} late</strong> — please close or re-date them before Monday.`
+    ? `<strong style="color:#CC3333;">${late.length} late</strong> — please close or re-date them before Monday.`
     : next.length ? `Nothing late. <strong>${next.length}</strong> due next week.` : 'Nothing late and nothing due next week.'
   const subject = `GC Task · My Tasks — ${w.doneLast7.length} done, ${late.length} late, ${next.length} next week`
   const dash = siteUrl() + '/tasks'
@@ -63,22 +63,22 @@ function buildEmail(m: TeamMember, w: MyWork): { subject: string; html: string }
   const closedPct = openCount + w.doneLast7.length ? Math.round(w.doneLast7.length / (openCount + w.doneLast7.length) * 100) : 0
   const stat = (label: string, val: number | string, color = '#1d1d1f') =>
     `<td style="width:14.2%;padding:10px 2px;text-align:center;background:#fff;border:1px solid #e5e7eb;border-radius:10px;"><div style="font-size:20px;font-weight:800;color:${color};">${val}</div><div style="font-size:10px;color:#6e6e73;">${label}</div></td>`
-  const stats = `<table role="presentation" style="width:100%;border-collapse:separate;border-spacing:5px;margin:0 -5px 12px;"><tr>${stat('Late', late.length, late.length ? '#FE1B04' : '#1d1d1f')}${stat('Due today', w.dueToday.length, w.dueToday.length ? '#b45309' : '#1d1d1f')}${stat('Next 7 days', w.thisWeek.length)}${stat('Later', w.later.length)}${stat('No date', w.noDate.length, w.noDate.length ? '#6e6e73' : '#1d1d1f')}${stat('Done this week', w.doneLast7.length, '#057642')}${stat('Closed %', closedPct + '%')}</tr></table>`
+  const stats = `<table role="presentation" style="width:100%;border-collapse:separate;border-spacing:5px;margin:0 -5px 12px;"><tr>${stat('Late', late.length, late.length ? '#CC3333' : '#1d1d1f')}${stat('Due today', w.dueToday.length, w.dueToday.length ? '#b45309' : '#1d1d1f')}${stat('Next 7 days', w.thisWeek.length)}${stat('Later', w.later.length)}${stat('No date', w.noDate.length, w.noDate.length ? '#6e6e73' : '#1d1d1f')}${stat('Done this week', w.doneLast7.length, '#057642')}${stat('Closed %', closedPct + '%')}</tr></table>`
 
   const html = `<!doctype html><html><body style="margin:0;background:#fafafa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1d1d1f;">
 <div style="max-width:620px;margin:0 auto;padding:24px 16px;">
   <div style="display:flex;align-items:center;margin-bottom:18px;">
-    <span style="display:inline-block;width:28px;height:28px;border-radius:7px;background:#FE1B04;color:#fff;text-align:center;line-height:28px;font-weight:900;font-size:16px;">✓</span>
-    <span style="font-size:18px;font-weight:800;color:#FE1B04;margin-left:10px;">Task</span><span style="font-size:12px;font-weight:600;color:#6e6e73;margin-left:6px;">by Gershon.AI</span>
+    <span style="display:inline-block;width:28px;height:28px;border-radius:7px;background:#CC3333;color:#fff;text-align:center;line-height:28px;font-weight:900;font-size:16px;">✓</span>
+    <span style="font-size:18px;font-weight:800;color:#CC3333;margin-left:10px;">Task</span><span style="font-size:12px;font-weight:600;color:#6e6e73;margin-left:6px;">by Gershon.AI</span>
   </div>
   <h1 style="font-size:22px;margin:0 0 4px;">${esc(first)}, here is your week</h1>
   <p style="margin:0 0 12px;color:#6e6e73;font-size:13px;">Week ending ${fmt(w.today)} · ${status}</p>
   <div style="font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#6e6e73;margin:0 0 2px;">My Tasks — ${openCount} open</div>
   ${stats}
-  ${box(`Late (${late.length})`, taskRows(late, 'late'), late.length ? '#FE1B04' : '#e5e7eb')}
+  ${box(`Late (${late.length})`, taskRows(late, 'late'), late.length ? '#CC3333' : '#e5e7eb')}
   ${box(`Due next week (${next.length})`, taskRows(next, 'next'))}
   ${box(`Done this week (${w.doneLast7.length})`, taskRows(w.doneLast7, 'done', 8), '#057642')}
-  <div style="text-align:center;margin:22px 0 8px;"><a href="${dash}" style="display:inline-block;background:#FE1B04;color:#fff;font-weight:700;font-size:14px;text-decoration:none;padding:12px 22px;border-radius:8px;">Open My Tasks →</a></div>
+  <div style="text-align:center;margin:22px 0 8px;"><a href="${dash}" style="display:inline-block;background:#CC3333;color:#fff;font-weight:700;font-size:14px;text-decoration:none;padding:12px 22px;border-radius:8px;">Open My Tasks →</a></div>
   <p style="text-align:center;font-size:11px;color:#6e6e73;margin-top:18px;">Your My Tasks report — sent every Friday to each member registered in Task (Settings → Team members). · <a href="${siteUrl()}" style="color:#6e6e73;">${siteUrl().replace('https://', '')}</a></p>
 </div></body></html>`
   return { subject, html }
