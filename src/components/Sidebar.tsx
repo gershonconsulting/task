@@ -60,7 +60,7 @@ function Icon({ d }: { d: string }) {
 export function BrandMark({ size = 28 }: { size?: number }) {
   return (
     <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden="true">
-      <rect width="64" height="64" rx="14" fill="#FE1B04" />
+      <rect width="64" height="64" rx="14" fill="#CC3333" />
       <path d="M18 33l9 9 19-20" fill="none" stroke="#fff" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
@@ -147,7 +147,7 @@ export default function Sidebar({ userName, userRole, isOwner }: SidebarProps) {
       {open && (
         <div className="md:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/30" onClick={() => setOpen(false)} />
-          <aside className="relative w-64 bg-white h-full px-3 py-[18px] flex flex-col overflow-y-auto shadow-xl">{body}</aside>
+          <aside className="relative w-60 max-w-[85vw] bg-white h-full px-3 py-[18px] flex flex-col overflow-y-auto shadow-xl">{body}</aside>
         </div>
       )}
     </>
