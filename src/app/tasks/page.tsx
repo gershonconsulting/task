@@ -93,7 +93,7 @@ export default async function TasksPage({
       <li className="flex items-center gap-3 py-2.5">
         <StatusSelect taskId={t.id} projectId={t.project_id ?? ''} status={st} />
         <div className="flex-1 min-w-0">
-          <div className={`text-[14px] truncate ${st === 'completed' ? 'text-[#6e6e73] line-through decoration-slate-300' : 'font-medium'}`}>
+          <div className={`text-[14px] break-words sm:truncate ${st === 'completed' ? 'text-[#6e6e73] line-through decoration-slate-300' : 'font-medium'}`}>
             {t.priority === 'high' && st !== 'completed' && <span className="mr-1.5 text-[10px] font-bold uppercase text-brand-700 bg-brand-50 border border-brand-100 rounded px-1.5 py-0.5 align-middle">high</span>}
             {t.name}
           </div>
@@ -104,7 +104,7 @@ export default async function TasksPage({
         <span className={`text-[12px] shrink-0 w-28 truncate text-right hidden sm:block ${t.assigned_to ? 'text-[#6e6e73]' : 'text-brand-600 font-semibold'}`}>
           {t.assigned_to ?? 'nobody'}
         </span>
-        <span className={`text-[12px] shrink-0 w-28 text-right ${late ? 'text-brand-600 font-semibold' : t.due_date === today ? 'text-amber-700 font-semibold' : 'text-[#6e6e73]'}`}>
+        <span className={`text-[12px] shrink-0 w-20 sm:w-28 text-right ${late ? 'text-brand-600 font-semibold' : t.due_date === today ? 'text-amber-700 font-semibold' : 'text-[#6e6e73]'}`}>
           {!t.due_date ? '—' : late ? `${daysLate}d late` : t.due_date === today ? 'today' : niceDate(t.due_date)}
         </span>
       </li>
