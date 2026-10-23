@@ -43,6 +43,19 @@ Default branch: main
 Version       : 0.6.0
 CI            : .github/
 
+3a. v1.3.0, 2026-10-18  [DONE]
+----------------------------------------------------------------
+- Friday reports split in two (Olivier 2026-10-18):
+  * "My Tasks" report per member: stats row (Late / Due today / Next 7
+    days / Later / No date / Done this week / Closed %) + task lists.
+    Team table removed from it (it is in the master now).
+  * Weekly MASTER report -> report@gershonconsulting.com: team KPIs,
+    per-member My Tasks stats, all late tasks with owner, clients with
+    progress, 8-week done trend. Code: src/lib/masterReport.ts.
+  Same endpoint /api/cron/weekly-report, same Friday 12:00 UTC workflow.
+  ?master=1 sends master only; separate once-a-day state key
+  master_report_state.
+
 2026-10-23 nightly — Cloudflare build fix (PR nightly/2026-10-23-task-build-fix)
 ----------------------------------------------------------------
 - ✅ Why every PR failed the "Cloudflare Pages" check (even e-mail-only
@@ -61,19 +74,6 @@ CI            : .github/
 - ❌ PRs #2-#5 go green only after this PR is merged and each one is
   updated from main ("Update branch" button), or if these 3 files are
   copied onto them.
-
-3a. v1.3.0, 2026-10-18  [DONE]
-----------------------------------------------------------------
-- Friday reports split in two (Olivier 2026-10-18):
-  * "My Tasks" report per member: stats row (Late / Due today / Next 7
-    days / Later / No date / Done this week / Closed %) + task lists.
-    Team table removed from it (it is in the master now).
-  * Weekly MASTER report -> report@gershonconsulting.com: team KPIs,
-    per-member My Tasks stats, all late tasks with owner, clients with
-    progress, 8-week done trend. Code: src/lib/masterReport.ts.
-  Same endpoint /api/cron/weekly-report, same Friday 12:00 UTC workflow.
-  ?master=1 sends master only; separate once-a-day state key
-  master_report_state.
 
 3. RECENTLY DONE  [DONE]  — v1.0.0, 2026-10-13
 ----------------------------------------------------------------
