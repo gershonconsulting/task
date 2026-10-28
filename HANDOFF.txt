@@ -56,6 +56,15 @@ CI            : .github/
   ?master=1 sends master only; separate once-a-day state key
   master_report_state.
 
+3c. v1.3.1, 2026-10-28  [PR, not deployed]
+----------------------------------------------------------------
+- 2026-10-28 nightly: "NO PROGRESS (0/6)" 10-22..10-27 was REAL inactivity
+  (0 tasks/projects/clients created or updated, last task write 2026-10-21
+  19:33 UTC; overdue flat at 43). True score was 1/6; the 0/6 was the
+  hardcoded subject fixed in PR #8. Daily report now lists WHICH measures
+  did not move (with links) and the 6 most overdue open tasks linked to
+  their project. Branch nightly/2026-10-28-task-progress (stacked on #8).
+
 3. RECENTLY DONE  [DONE]  — v1.0.0, 2026-10-13
 ----------------------------------------------------------------
 - Renamed "Task by Gershon.AI"; Linalysis layout in Gershon.ai red #FE1B04

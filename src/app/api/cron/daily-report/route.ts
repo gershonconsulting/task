@@ -30,6 +30,8 @@ type Client = { id: string; name: string; created_at: string }
 
 type Snapshot = { date: string; run_at: string; tasks_total: number; tasks_done: number; projects_total: number; overdue: number; pct: number }
 type DayCounts = { projectsCreated: number; tasksCreated: number; tasksTouched: number; tasksCompleted: number; clientsAdded: number }
+type Check = { label: string; v: number; p: number; ok: boolean; why: string; href: string }
+type StuckTask = { name: string; owner: string | null; due: string; daysLate: number; project: string | null; href: string }
 
 function readEnv(name: string): string | undefined {
   try { return (getRequestContext().env as Record<string, string>)[name] } catch { return process.env[name] }
@@ -116,15 +118,32 @@ async function handle(req: NextRequest, preview: boolean) {
   const daysSinceWrite = lastWriteYmd ? daysBetween(lastWriteYmd, todayYmd) : null
 
   // Progress score, 6 measures, 1 point each.
-  const checks = [
-    { label: 'Projects created', v: y.projectsCreated, p: d.projectsCreated, ok: y.projectsCreated > 0 },
-    { label: 'Tasks created', v: y.tasksCreated, p: d.tasksCreated, ok: y.tasksCreated > 0 },
-    { label: 'Tasks completed', v: y.tasksCompleted, p: d.tasksCompleted, ok: y.tasksCompleted > 0 },
-    { label: 'Tasks touched', v: y.tasksTouched, p: d.tasksTouched, ok: y.tasksTouched > 0 },
-    { label: 'Completion %', v: pct, p: prev ? prev.pct : pct, ok: prev ? pct > prev.pct : false },
-    { label: 'Overdue tasks', v: overdue, p: prev ? prev.overdue : overdue, ok: prev ? overdue <= prev.overdue : overdue === 0 },
+  // `why` explains a ✗ in plain words; `href` is where to act on it in the app.
+  const base = siteUrl()
+  const checks: Check[] = [
+    { label: 'Projects created', v: y.projectsCreated, p: d.projectsCreated, ok: y.projectsCreated > 0, why: 'No new project was opened.', href: base + '/projects' },
+    { label: 'Tasks created', v: y.tasksCreated, p: d.tasksCreated, ok: y.tasksCreated > 0, why: 'No task was added to any project.', href: base + '/tasks' },
+    { label: 'Tasks completed', v: y.tasksCompleted, p: d.tasksCompleted, ok: y.tasksCompleted > 0, why: 'No task was marked done (' + (tasksTotal - tasksDone) + ' still open).', href: base + '/tasks' },
+    { label: 'Tasks touched', v: y.tasksTouched, p: d.tasksTouched, ok: y.tasksTouched > 0, why: 'No task was edited, re-dated or re-assigned.', href: base + '/tasks' },
+    { label: 'Completion %', v: pct, p: prev ? prev.pct : pct, ok: prev ? pct > prev.pct : false, why: 'Overall completion stayed at ' + pct + '% (' + tasksDone + '/' + tasksTotal + ').', href: base + '/dashboard' },
+    { label: 'Overdue tasks', v: overdue, p: prev ? prev.overdue : overdue, ok: prev ? overdue <= prev.overdue : overdue === 0, why: 'Overdue tasks went up to ' + overdue + '.', href: base + '/tasks' },
   ]
   const score = checks.filter(c => c.ok).length
+
+  // The open tasks that are most overdue: the concrete items to move next, each linked to its project.
+  const projectName = new Map(allProjects.map(p => [p.id, p.company_name]))
+  const stuck: StuckTask[] = allTasks
+    .filter(t => t.status !== 'completed' && t.due_date && t.due_date < todayYmd)
+    .sort((a, b) => (a.due_date! < b.due_date! ? -1 : a.due_date! > b.due_date! ? 1 : 0))
+    .slice(0, 6)
+    .map(t => ({
+      name: t.name,
+      owner: t.assigned_to,
+      due: t.due_date!,
+      daysLate: daysBetween(t.due_date!.slice(0, 10), todayYmd),
+      project: t.project_id ? projectName.get(t.project_id) ?? null : null,
+      href: t.project_id ? base + '/projects/' + t.project_id : base + '/tasks',
+    }))
 
   // Did the system do its daily job?
   const nothingHappened = y.projectsCreated + y.tasksCreated + y.tasksTouched + y.clientsAdded === 0
@@ -138,7 +157,7 @@ async function handle(req: NextRequest, preview: boolean) {
   if (missedRuns > 0) warnings.push('The daily report did not run for ' + missedRuns + ' day(s) — last run was ' + esc(prev!.date) + '. The scheduled job is failing or disabled.')
   if (summary.alarm) warnings.push('Nothing moved on ' + longDate(yYmd) + ': no project, task or client was created, updated or completed.' + (daysSinceWrite !== null ? ' The last change of any kind was ' + daysSinceWrite + ' day(s) ago.' : ''))
 
-  const html = buildEmail({ yYmd, dYmd, y, d, checks, score, summary, pct, tasksDone, tasksTotal, overdue, overdueGrew, activeProjects, clientsTotal: allClients.length, warnings, prev, daysSinceWrite })
+  const html = buildEmail({ yYmd, dYmd, y, d, checks, score, summary, pct, tasksDone, tasksTotal, overdue, overdueGrew, activeProjects, clientsTotal: allClients.length, warnings, prev, daysSinceWrite, stuck })
   const subject =
     (warnings.length ? '⚠ ' : '') +
     'Task — Daily report, ' + longDate(yYmd).replace(/^\w+, /, '') + ' — ' +
@@ -194,10 +213,36 @@ export async function GET(req: NextRequest) { return handle(req, new URL(req.url
 function buildEmail(a: {
   yYmd: string; dYmd: string
   y: DayCounts; d: DayCounts
-  checks: Array<{ label: string; v: number; p: number; ok: boolean }>
+  checks: Check[]
   score: number; summary: ReportSummary; pct: number; tasksDone: number; tasksTotal: number; overdue: number; overdueGrew: boolean
   activeProjects: number; clientsTotal: number; warnings: string[]; prev: Snapshot | null; daysSinceWrite: number | null
+  stuck: StuckTask[]
 }): string {
+  const link = 'color:#1f6f5c;text-decoration:underline;'
+  // Which of the 6 measures did not move, why, and where to fix it.
+  const failed = a.checks.filter(c => !c.ok)
+  const failedHtml = failed.length
+    ? "<div style='background:#ffffff;border-left:5px solid #c0392b;border-radius:6px;padding:20px 24px;margin-bottom:16px;'>" +
+      "<div style='font-size:16px;font-weight:700;color:#12352c;margin-bottom:10px;'>What did not move (" + failed.length + " of " + a.checks.length + ")</div>" +
+      "<ol style='margin:0;padding-left:20px;font-size:14px;color:#1a1a1a;line-height:1.6;'>" +
+      failed.map(c => "<li><b>" + esc(c.label) + "</b> — " + esc(c.why) + " <a href='" + esc(c.href) + "' style='" + link + "'>Open</a></li>").join('') +
+      "</ol></div>"
+    : ''
+  const stuckHtml = a.stuck.length
+    ? "<div style='background:#ffffff;border-radius:6px;padding:20px 24px;margin-bottom:16px;'>" +
+      "<div style='font-size:16px;font-weight:700;color:#12352c;margin-bottom:4px;'>Most overdue open tasks — move these next</div>" +
+      "<div style='font-size:13px;color:#5b6b66;margin-bottom:10px;'>Showing " + a.stuck.length + " of " + a.overdue + " overdue. Each link opens the task's project.</div>" +
+      "<table style='width:100%;border-collapse:collapse;font-size:14px;'>" +
+      "<tr style='background:#f0f4f3;'><th align='left' style='padding:8px 10px;color:#12352c;'>Task</th>" +
+      "<th align='left' style='padding:8px 10px;color:#12352c;'>Owner</th>" +
+      "<th align='right' style='padding:8px 10px;color:#12352c;'>Late</th></tr>" +
+      a.stuck.map(s =>
+        "<tr><td style='padding:8px 10px;border-bottom:1px solid #e6ebe9;'><a href='" + esc(s.href) + "' style='" + link + "'>" + esc(s.name) + "</a>" +
+        (s.project ? "<div style='font-size:12px;color:#8a9995;'>" + esc(s.project) + "</div>" : '') + "</td>" +
+        "<td style='padding:8px 10px;border-bottom:1px solid #e6ebe9;'>" + esc(s.owner || 'Unassigned') + "</td>" +
+        "<td align='right' style='padding:8px 10px;border-bottom:1px solid #e6ebe9;color:#c0392b;white-space:nowrap;'>" + s.daysLate + " d</td></tr>").join('') +
+      "</table></div>"
+    : ''
   const card = 'background:#ffffff;border-left:5px solid #1f6f5c;border-radius:6px;padding:20px 24px;margin-bottom:16px;'
   const rows = a.checks.map(c =>
     "<tr>" +
@@ -238,7 +283,9 @@ function buildEmail(a: {
       "<th align='center' style='padding:8px 10px;color:#12352c;'>Previous</th>" +
       "<th align='center' style='padding:8px 10px;color:#12352c;'>&nbsp;</th></tr>" + rows + "</table>" +
     "</div>" +
+    failedHtml +
     overdueHtml +
+    stuckHtml +
     "<div style='background:#ffffff;border-radius:6px;padding:20px 24px;margin-bottom:16px;'>" +
       "<div style='font-size:16px;font-weight:700;color:#12352c;margin-bottom:10px;'>Where the app stands today</div>" +
       "<table style='width:100%;border-collapse:collapse;font-size:14px;'>" +
