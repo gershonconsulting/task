@@ -18,7 +18,7 @@
 
 const SB_URL = Deno.env.get("SUPABASE_URL")!;
 const SB_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const CRON_SECRET = "cpm_3bf7bdc1b4f4786443748448";
+const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
 const RADAR_URL = "https://pkzeeqehwmtnqxdpdesl.supabase.co";
 const TO = ["report@gershonconsulting.com"];
 const FROM = "GC Client Matrix <reports@gershon.ai>";
@@ -64,7 +64,7 @@ function weekLabel() {
 Deno.serve(async (req) => {
   let body: any = {};
   try { body = await req.json(); } catch (_) { /* empty */ }
-  if (body?.secret !== CRON_SECRET) return json({ ok: false, error: "unauthorized" }, 401);
+  if (!CRON_SECRET || body?.secret !== CRON_SECRET) return json({ ok: false, error: "unauthorized" }, 401);
 
   try {
     const cols: any[] = await rest("client_platform_columns?active=eq.true&select=*&order=sort.asc");
