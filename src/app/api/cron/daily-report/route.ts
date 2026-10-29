@@ -4,6 +4,7 @@ import { siteUrl } from '@/lib/site'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { supabaseAdmin } from '@/lib/supabaseServer'
+import { summarize, type ReportSummary } from '@/lib/dailyReportSummary'
 
 // Daily "what happened yesterday" report for Task by Gershon.AI.
 // Triggered by .github/workflows/daily-report.yml at 11:00 UTC (07:00 ET) with the CRON_SECRET
@@ -130,15 +131,18 @@ async function handle(req: NextRequest, preview: boolean) {
   const missedRuns = prev ? Math.max(0, daysBetween(prev.date, todayYmd) - 1) : 0
   const overdueGrew = prev ? overdue > prev.overdue : false
 
+  // One summary object drives the subject, the header and the body so they can never disagree.
+  const summary = summarize({ score, nothingHappened, todayYmd, reportedYmd: yYmd })
+
   const warnings: string[] = []
   if (missedRuns > 0) warnings.push('The daily report did not run for ' + missedRuns + ' day(s) — last run was ' + esc(prev!.date) + '. The scheduled job is failing or disabled.')
-  if (nothingHappened) warnings.push('Nothing moved on ' + longDate(yYmd) + ': no project, task or client was created, updated or completed.' + (daysSinceWrite !== null ? ' The last change of any kind was ' + daysSinceWrite + ' day(s) ago.' : ''))
+  if (summary.alarm) warnings.push('Nothing moved on ' + longDate(yYmd) + ': no project, task or client was created, updated or completed.' + (daysSinceWrite !== null ? ' The last change of any kind was ' + daysSinceWrite + ' day(s) ago.' : ''))
 
-  const html = buildEmail({ yYmd, dYmd, y, d, checks, score, pct, tasksDone, tasksTotal, overdue, overdueGrew, activeProjects, clientsTotal: allClients.length, warnings, prev, daysSinceWrite })
+  const html = buildEmail({ yYmd, dYmd, y, d, checks, score, summary, pct, tasksDone, tasksTotal, overdue, overdueGrew, activeProjects, clientsTotal: allClients.length, warnings, prev, daysSinceWrite })
   const subject =
     (warnings.length ? '⚠ ' : '') +
     'Task — Daily report, ' + longDate(yYmd).replace(/^\w+, /, '') + ' — ' +
-    (nothingHappened ? 'NO PROGRESS (0/6)' : 'Progress ' + score + '/6')
+    summary.subjectTail
 
   const snapshot: Snapshot = { date: todayYmd, run_at: now.toISOString(), tasks_total: tasksTotal, tasks_done: tasksDone, projects_total: allProjects.length, overdue, pct }
 
@@ -191,7 +195,7 @@ function buildEmail(a: {
   yYmd: string; dYmd: string
   y: DayCounts; d: DayCounts
   checks: Array<{ label: string; v: number; p: number; ok: boolean }>
-  score: number; pct: number; tasksDone: number; tasksTotal: number; overdue: number; overdueGrew: boolean
+  score: number; summary: ReportSummary; pct: number; tasksDone: number; tasksTotal: number; overdue: number; overdueGrew: boolean
   activeProjects: number; clientsTotal: number; warnings: string[]; prev: Snapshot | null; daysSinceWrite: number | null
 }): string {
   const card = 'background:#ffffff;border-left:5px solid #1f6f5c;border-radius:6px;padding:20px 24px;margin-bottom:16px;'
@@ -222,11 +226,12 @@ function buildEmail(a: {
     "<div style='" + card + "'>" +
       "<div style='font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#5b6b66;margin-bottom:6px;'>Daily progress report</div>" +
       "<div style='font-size:22px;font-weight:700;color:#12352c;'>Task — what happened yesterday</div>" +
-      "<div style='font-size:14px;color:#5b6b66;margin-top:4px;'>" + longDate(a.yYmd) + "</div>" +
+      "<div style='font-size:14px;color:#5b6b66;margin-top:4px;'>" + longDate(a.yYmd) + " &middot; <b>" + esc(a.summary.headerLine) + "</b></div>" +
     "</div>" +
     warnHtml +
+    (a.summary.quietNote ? "<div style='background:#f0f4f3;border-radius:6px;padding:12px 24px;margin-bottom:16px;font-size:14px;color:#5b6b66;'>" + esc(a.summary.quietNote) + "</div>" : '') +
     "<div style='background:#ffffff;border-radius:6px;padding:20px 24px;margin-bottom:16px;'>" +
-      "<div style='font-size:16px;font-weight:700;color:#12352c;margin-bottom:12px;'>Progress score: " + a.score + " / 6</div>" +
+      "<div style='font-size:16px;font-weight:700;color:#12352c;margin-bottom:12px;'>Progress score: " + a.summary.score + " / " + a.summary.max + "</div>" +
       "<table style='width:100%;border-collapse:collapse;font-size:14px;'>" +
       "<tr style='background:#f0f4f3;'><th align='left' style='padding:8px 10px;color:#12352c;'>Measure</th>" +
       "<th align='center' style='padding:8px 10px;color:#12352c;'>Yesterday</th>" +
