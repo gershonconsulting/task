@@ -56,6 +56,25 @@ CI            : .github/
   ?master=1 sends master only; separate once-a-day state key
   master_report_state.
 
+2026-10-23 nightly — Cloudflare build fix (PR nightly/2026-10-23-task-build-fix)
+----------------------------------------------------------------
+- ✅ Why every PR failed the "Cloudflare Pages" check (even e-mail-only
+  ones): `npm install` stopped with ERESOLVE before building.
+  @cloudflare/next-on-pages wants @cloudflare/workers-types ^4, the
+  wrangler 4.x it pulls in wants ^5. package-lock.json is gitignored, so
+  every Cloudflare build resolves fresh and hits it. Same install step
+  in .github/workflows/deploy.yml, so pushes to main would fail too.
+- ✅ Fix: .npmrc (legacy-peer-deps=true), wrangler ^4 listed in
+  devDependencies (next.config.mjs imports next-on-pages/next-dev,
+  which needs wrangler installed), .nvmrc = 22 (Next 15 needs Node
+  >= 18.18; Pages' old default image is 18.17).
+- ✅ Verified locally: npm install + npx @cloudflare/next-on-pages pass
+  for main (Node 20.11.1 and 22) and for PR #2, #3, #4 and #5 (Node
+  20.11.1) with these files added. Without them: ERESOLVE.
+- ❌ PRs #2-#5 go green only after this PR is merged and each one is
+  updated from main ("Update branch" button), or if these 3 files are
+  copied onto them.
+
 3. RECENTLY DONE  [DONE]  — v1.0.0, 2026-10-13
 ----------------------------------------------------------------
 - Renamed "Task by Gershon.AI"; Linalysis layout in Gershon.ai red #FE1B04
