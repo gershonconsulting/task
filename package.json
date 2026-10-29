@@ -25,6 +25,7 @@
     "tailwindcss": "^3.4.1",
     "postcss": "^8",
     "autoprefixer": "^10.0.1",
-    "@cloudflare/next-on-pages": "^1"
+    "@cloudflare/next-on-pages": "^1",
+    "wrangler": "^4.0.0"
   }
 }
