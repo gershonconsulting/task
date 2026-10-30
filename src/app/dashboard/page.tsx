@@ -64,7 +64,7 @@ export default async function DashboardPage() {
         <Kpi title="Done · last 7 days" value={work.totals.doneLast7} sub="tasks completed by the team" tone="text-[#057642]" />
       </div>
 
-      <div className="grid lg:grid-cols-[3fr_2fr] gap-3.5 mb-5">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-3.5 mb-5">
         {/* Progress by client */}
         <section className={card}>
           <div className="flex items-baseline justify-between mb-3">
@@ -74,7 +74,7 @@ export default async function DashboardPage() {
           <ul className="space-y-2.5">
             {clients.map(c => (
               <li key={c.key} title={`${c.name}: ${c.pct}% done (${c.done}/${c.total} tasks), ${c.overdue} late, ${c.projects.length} projects`}>
-                <Link href="/clients" className="grid grid-cols-[150px_1fr_64px] items-center gap-3 group">
+                <Link href="/clients" className="grid grid-cols-[96px_1fr_56px] sm:grid-cols-[150px_1fr_64px] items-center gap-3 group">
                   <span className="text-[13px] font-medium truncate group-hover:text-brand-600">{c.name}</span>
                   <span className="relative h-3 bg-[#f0f0f2] rounded">
                     <span className="absolute inset-y-0 left-0 rounded bg-[#1d1d1f]" style={{ width: Math.max(c.pct, 1) + '%' }} />
@@ -96,7 +96,7 @@ export default async function DashboardPage() {
             </div>
             <ul className="space-y-2">
               {byGroup.map(x => (
-                <li key={x.g} className="grid grid-cols-[96px_1fr_70px] items-center gap-3" title={`${x.g}: ${x.total} projects, ${x.late} with late tasks`}>
+                <li key={x.g} className="grid grid-cols-[84px_1fr_64px] sm:grid-cols-[96px_1fr_70px] items-center gap-3" title={`${x.g}: ${x.total} projects, ${x.late} with late tasks`}>
                   <span className="text-[13px]">{x.g}</span>
                   <span className="h-3 bg-[#f0f0f2] rounded relative"><span className="absolute inset-y-0 left-0 rounded bg-[#1d1d1f]" style={{ width: (x.total / maxGroup * 100) + '%' }} /></span>
                   <span className="text-[12px] text-right tabular-nums"><strong>{x.total}</strong>{x.late ? <span className="text-brand-600"> · {x.late} late</span> : null}</span>
@@ -138,13 +138,13 @@ export default async function DashboardPage() {
         <ul className="space-y-2.5">
           {people.map(t => (
             <li key={t.member.id} title={`${t.member.name}: ${t.open} open (${t.overdue} late), ${t.dueThisWeek} due next 7 days, ${t.doneLast7} done last 7 days`}>
-              <Link href={'/tasks?who=' + encodeURIComponent(t.member.id)} className="grid grid-cols-[150px_1fr_190px] items-center gap-3 group">
+              <Link href={'/tasks?who=' + encodeURIComponent(t.member.id)} className="grid grid-cols-[96px_1fr] sm:grid-cols-[150px_1fr_190px] items-center gap-x-3 gap-y-1 group">
                 <span className="text-[13px] font-medium truncate group-hover:text-brand-600">{t.member.name}</span>
                 <span className="h-3 flex gap-[2px]" style={{ width: (t.open / maxOpen * 100) + '%' }}>
                   {t.overdue > 0 && <span className="h-full rounded-l bg-brand-600" style={{ flex: t.overdue }} />}
                   {t.open - t.overdue > 0 && <span className={`h-full bg-[#9ca3af] ${t.overdue ? '' : 'rounded-l'} rounded-r`} style={{ flex: t.open - t.overdue }} />}
                 </span>
-                <span className="text-[12px] text-right tabular-nums text-[#6e6e73]">
+                <span className="col-span-2 sm:col-span-1 text-[12px] sm:text-right tabular-nums text-[#6e6e73]">
                   <strong className="text-[#1d1d1f]">{t.open}</strong> open{t.overdue ? <span className="text-brand-600 font-semibold"> · {t.overdue} late</span> : null} · <span className="text-[#057642]">{t.doneLast7} done</span>
                 </span>
               </Link>
