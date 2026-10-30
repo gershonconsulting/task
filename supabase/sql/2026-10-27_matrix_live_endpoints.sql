@@ -19,7 +19,7 @@ update client_platform_columns
    set endpoint = 'https://pulse.gershoncrm.com/api/matrix-stats', source = 'live'
  where key = 'pulse';
 
--- 4) Events / ICP stay active = false until each app ships the same endpoint. Then, per app:
+-- 4) Template for any further column:
 -- update client_platform_columns set endpoint = 'https://<host>/api/matrix-stats', source = 'live', active = true where key = '<key>';
 
 -- 5) Client — run AFTER gershonconsulting/client PR (nightly/2026-10-28-matrix-stats) is merged
@@ -40,5 +40,17 @@ update client_platform_columns
    set endpoint = 'https://socialtracking.gershon.ai/api/matrix-stats', source = 'live', active = true
  where key = 'socialtracking';
 
+-- 8) Events — run AFTER gershonconsulting/events-gershon-ai PR (nightly/2026-10-30-matrix-stats) is merged
+--    (push to main deploys via Workers Builds). Host: events.gershon.ai (KV STORE, clients + graded events).
+update client_platform_columns
+   set endpoint = 'https://events.gershon.ai/api/matrix-stats', source = 'live', active = true
+ where key = 'events';
+
+-- 9) ICP — run AFTER gershonconsulting/ICP PR (nightly/2026-10-30-matrix-stats) is merged AND deployed
+--    (pushes do not auto-deploy: POST the "claude-deploy" Deploy Hook). Host: icp.gershon.ai (KV STORE, report:*).
+update client_platform_columns
+   set endpoint = 'https://icp.gershon.ai/api/matrix-stats', source = 'live', active = true
+ where key = 'icp';
+
 -- ROLLBACK (any column): update client_platform_columns set endpoint = null, source = 'manual' where key = '<key>';
--- ROLLBACK 5-7 (back to hidden): update client_platform_columns set endpoint = null, source = 'pending', active = false where key in ('client','publish','socialtracking');
+-- ROLLBACK 5-9 (back to hidden): update client_platform_columns set endpoint = null, source = 'pending', active = false where key in ('client','publish','socialtracking','events','icp');
