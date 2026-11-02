@@ -12,7 +12,7 @@
 
 const SB_URL = Deno.env.get("SUPABASE_URL")!;
 const SB_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const CRON_SECRET = "cpm_3bf7bdc1b4f4786443748448";
+// Trigger secret lives in cc_health_config (key matrix_cron_secret) — never in code (this repo is public).
 const RADAR_URL = "https://pkzeeqehwmtnqxdpdesl.supabase.co";
 const TO = ["report@gershonconsulting.com"];
 const FROM = "GC Client Matrix <reports@gershon.ai>";
@@ -68,7 +68,11 @@ async function sendMail(to: string[], subject: string, html: string, from: strin
 Deno.serve(async (req) => {
   let body: any = {};
   try { body = await req.json(); } catch (_) { /* empty */ }
-  if (body?.secret !== CRON_SECRET) return json({ ok: false, error: "unauthorized" }, 401);
+  let expected: string | null = null;
+  try { expected = await cfg("matrix_cron_secret"); } catch (_) { /* treated as unauthorized */ }
+  if (!expected || typeof body?.secret !== "string" || body.secret !== expected) return json({ ok: false, error: "unauthorized" }, 401);
+  // Test sends only ever go to an internal address.
+  if (body.testTo && !/^[^@\s]+@gershonconsulting\.com$/i.test(String(body.testTo))) return json({ ok: false, error: "testTo must be an @gershonconsulting.com address" }, 400);
 
   // Relay: health.gershon.ai built the email; this function only sends it.
   if (typeof body.html === "string" && typeof body.subject === "string") {
