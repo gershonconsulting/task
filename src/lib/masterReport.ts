@@ -53,7 +53,7 @@ export async function buildMasterReport(team: TeamMember[]): Promise<{ subject: 
 
   // Who: name for each late task
   const owner = (a: string | null) => {
-    if (!a) return '<span style="color:#FE1B04;font-weight:700;">nobody</span>'
+    if (!a) return '<span style="color:#CC3333;font-weight:700;">nobody</span>'
     const m = team.find(x => isAssignedTo(x, a))
     return esc(m ? m.name.split(' ')[0] : a)
   }
@@ -67,38 +67,38 @@ export async function buildMasterReport(team: TeamMember[]): Promise<{ subject: 
 
   const members = base.team.map(t => {
     const rate = t.open + t.doneLast7 ? Math.round(t.doneLast7 / (t.open + t.doneLast7) * 100) : 0
-    return `<tr><td style="${td}">${esc(t.member.name)}</td><td style="${td}text-align:right;color:#057642;font-weight:700;">${t.doneLast7}</td><td style="${td}text-align:right;${t.overdue ? 'color:#FE1B04;font-weight:700;' : 'color:#6e6e73;'}">${t.overdue}</td><td style="${td}text-align:right;">${t.dueThisWeek}</td><td style="${td}text-align:right;">${t.open}</td><td style="${td}text-align:right;color:#6e6e73;">${rate}%</td></tr>`
+    return `<tr><td style="${td}">${esc(t.member.name)}</td><td style="${td}text-align:right;color:#057642;font-weight:700;">${t.doneLast7}</td><td style="${td}text-align:right;${t.overdue ? 'color:#CC3333;font-weight:700;' : 'color:#6e6e73;'}">${t.overdue}</td><td style="${td}text-align:right;">${t.dueThisWeek}</td><td style="${td}text-align:right;">${t.open}</td><td style="${td}text-align:right;color:#6e6e73;">${rate}%</td></tr>`
   }).join('')
 
   const clientTable = clientRows.map(([c, r]) => {
     const p = r.total ? Math.round(r.done / r.total * 100) : 0
-    return `<tr><td style="${td}">${esc(c)}<div style="height:4px;background:#f0f0f2;border-radius:2px;margin-top:4px;"><div style="height:4px;width:${p}%;background:#057642;border-radius:2px;"></div></div></td><td style="${td}text-align:right;color:#6e6e73;">${p}%</td><td style="${td}text-align:right;color:#057642;">${r.doneWeek}</td><td style="${td}text-align:right;${r.late ? 'color:#FE1B04;font-weight:700;' : 'color:#6e6e73;'}">${r.late}</td><td style="${td}text-align:right;">${r.open}</td></tr>`
+    return `<tr><td style="${td}">${esc(c)}<div style="height:4px;background:#f0f0f2;border-radius:2px;margin-top:4px;"><div style="height:4px;width:${p}%;background:#057642;border-radius:2px;"></div></div></td><td style="${td}text-align:right;color:#6e6e73;">${p}%</td><td style="${td}text-align:right;color:#057642;">${r.doneWeek}</td><td style="${td}text-align:right;${r.late ? 'color:#CC3333;font-weight:700;' : 'color:#6e6e73;'}">${r.late}</td><td style="${td}text-align:right;">${r.open}</td></tr>`
   }).join('')
 
   const maxW = Math.max(1, ...base.weekly.map(w => w.done))
   const trend = `<table role="presentation" style="width:100%;border-collapse:collapse;"><tr>${base.weekly.map(w =>
-    `<td style="vertical-align:bottom;text-align:center;padding:0 3px;"><div style="font-size:11px;color:#1d1d1f;font-weight:700;">${w.done}</div><div style="height:${Math.max(3, Math.round(w.done / maxW * 70))}px;background:#FE1B04;border-radius:3px 3px 0 0;"></div><div style="font-size:10px;color:#6e6e73;margin-top:3px;">${new Date(w.weekStart + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', timeZone: 'UTC' })}</div></td>`).join('')}</tr></table>`
+    `<td style="vertical-align:bottom;text-align:center;padding:0 3px;"><div style="font-size:11px;color:#1d1d1f;font-weight:700;">${w.done}</div><div style="height:${Math.max(3, Math.round(w.done / maxW * 70))}px;background:#CC3333;border-radius:3px 3px 0 0;"></div><div style="font-size:10px;color:#6e6e73;margin-top:3px;">${new Date(w.weekStart + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', timeZone: 'UTC' })}</div></td>`).join('')}</tr></table>`
 
   const lateList = lateAll.length
     ? `<table role="presentation" style="width:100%;border-collapse:collapse;">${lateAll.slice(0, 20).map(t =>
-      `<tr><td style="${td}">${esc(t.name)}<div style="font-size:12px;color:#6e6e73;">${esc(cleanClient(proj.get(t.project_id)!.company_name))}</div></td><td style="${td}text-align:right;white-space:nowrap;">${owner(t.assigned_to)}</td><td style="${td}text-align:right;white-space:nowrap;color:#FE1B04;font-weight:700;">${daysLate(t.due_date!)}d</td></tr>`).join('')}${lateAll.length > 20 ? `<tr><td colspan="3" style="padding:8px 0;font-size:12px;color:#6e6e73;">+ ${lateAll.length - 20} more late tasks</td></tr>` : ''}</table>`
+      `<tr><td style="${td}">${esc(t.name)}<div style="font-size:12px;color:#6e6e73;">${esc(cleanClient(proj.get(t.project_id)!.company_name))}</div></td><td style="${td}text-align:right;white-space:nowrap;">${owner(t.assigned_to)}</td><td style="${td}text-align:right;white-space:nowrap;color:#CC3333;font-weight:700;">${daysLate(t.due_date!)}d</td></tr>`).join('')}${lateAll.length > 20 ? `<tr><td colspan="3" style="padding:8px 0;font-size:12px;color:#6e6e73;">+ ${lateAll.length - 20} more late tasks</td></tr>` : ''}</table>`
     : '<p style="margin:0;color:#6e6e73;font-size:13px;">Nothing late across the team. 👏</p>'
 
   const trendWord = T.doneLast7 > prevWeekDone ? `up from ${prevWeekDone}` : T.doneLast7 < prevWeekDone ? `down from ${prevWeekDone}` : `same as last week`
   const subject = `GC Task · Weekly master report — ${T.doneLast7} done, ${T.late} late, ${T.open} open`
   const html = `<!doctype html><html><body style="margin:0;background:#fafafa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1d1d1f;">
 <div style="max-width:680px;margin:0 auto;padding:24px 16px;">
-  <div style="margin-bottom:18px;"><span style="display:inline-block;width:28px;height:28px;border-radius:7px;background:#FE1B04;color:#fff;text-align:center;line-height:28px;font-weight:900;font-size:16px;">✓</span><span style="font-size:18px;font-weight:800;color:#FE1B04;margin-left:10px;">Task</span><span style="font-size:12px;font-weight:600;color:#6e6e73;margin-left:6px;">by Gershon.AI</span></div>
+  <div style="margin-bottom:18px;"><span style="display:inline-block;width:28px;height:28px;border-radius:7px;background:#CC3333;color:#fff;text-align:center;line-height:28px;font-weight:900;font-size:16px;">✓</span><span style="font-size:18px;font-weight:800;color:#CC3333;margin-left:10px;">Task</span><span style="font-size:12px;font-weight:600;color:#6e6e73;margin-left:6px;">by Gershon.AI</span></div>
   <h1 style="font-size:22px;margin:0 0 4px;">Weekly master report</h1>
   <p style="margin:0 0 16px;color:#6e6e73;font-size:13px;">Week ending ${fmt(today)} · ${T.doneLast7} tasks done (${trendWord}) · ${createdThisWeek} tasks and ${newProjects} projects created · ${pct}% of all tasks complete</p>
   <table role="presentation" style="width:100%;border-collapse:separate;border-spacing:6px;margin:0 -6px 10px;"><tr>
-    ${kpi('Done this week', T.doneLast7, '#057642')}${kpi('Late', T.late, T.late ? '#FE1B04' : '#1d1d1f')}${kpi('Due next 7d', T.dueNext7)}${kpi('Open', T.open)}${kpi('Unassigned', T.unassigned, T.unassigned ? '#b45309' : '#1d1d1f')}${kpi('Active projects', proj.size)}
+    ${kpi('Done this week', T.doneLast7, '#057642')}${kpi('Late', T.late, T.late ? '#CC3333' : '#1d1d1f')}${kpi('Due next 7d', T.dueNext7)}${kpi('Open', T.open)}${kpi('Unassigned', T.unassigned, T.unassigned ? '#b45309' : '#1d1d1f')}${kpi('Active projects', proj.size)}
   </tr></table>
   ${box('Team — My Tasks stats per member', `<table role="presentation" style="width:100%;border-collapse:collapse;"><tr><td style="${th}">Member</td><td style="${th}text-align:right;">Done</td><td style="${th}text-align:right;">Late</td><td style="${th}text-align:right;">Next 7d</td><td style="${th}text-align:right;">Open</td><td style="${th}text-align:right;">Closed %</td></tr>${members}</table>`)}
-  ${box(`Late tasks — whole team (${lateAll.length})`, lateList, lateAll.length ? '#FE1B04' : '#e5e7eb')}
+  ${box(`Late tasks — whole team (${lateAll.length})`, lateList, lateAll.length ? '#CC3333' : '#e5e7eb')}
   ${box('Clients', clientRows.length ? `<table role="presentation" style="width:100%;border-collapse:collapse;"><tr><td style="${th}">Client · progress</td><td style="${th}text-align:right;">%</td><td style="${th}text-align:right;">Done wk</td><td style="${th}text-align:right;">Late</td><td style="${th}text-align:right;">Open</td></tr>${clientTable}</table>` : '<p style="margin:0;color:#6e6e73;font-size:13px;">No active client work.</p>')}
   ${box('Tasks done per week (last 8 weeks)', trend, '#057642')}
-  <div style="text-align:center;margin:22px 0 8px;"><a href="${siteUrl()}/dashboard" style="display:inline-block;background:#FE1B04;color:#fff;font-weight:700;font-size:14px;text-decoration:none;padding:12px 22px;border-radius:8px;">Open the dashboard →</a></div>
+  <div style="text-align:center;margin:22px 0 8px;"><a href="${siteUrl()}/dashboard" style="display:inline-block;background:#CC3333;color:#fff;font-weight:700;font-size:14px;text-decoration:none;padding:12px 22px;border-radius:8px;">Open the dashboard →</a></div>
   <p style="text-align:center;font-size:11px;color:#6e6e73;margin-top:18px;">Weekly master report · sent every Friday to ${MASTER_TO}. Each member also gets their own "My Tasks" report. · <a href="${siteUrl()}" style="color:#6e6e73;">${siteUrl().replace('https://', '')}</a></p>
 </div></body></html>`
   return { subject, html }
