@@ -19,8 +19,26 @@ update client_platform_columns
    set endpoint = 'https://pulse.gershoncrm.com/api/matrix-stats', source = 'live'
  where key = 'pulse';
 
--- 4) Client / Publish / Social Tracking / Events / ICP stay active = false until each app
---    ships the same endpoint. Then, per app:
+-- 4) Events / ICP stay active = false until each app ships the same endpoint. Then, per app:
 -- update client_platform_columns set endpoint = 'https://<host>/api/matrix-stats', source = 'live', active = true where key = '<key>';
 
+-- 5) Client — run AFTER gershonconsulting/client PR (nightly/2026-10-28-matrix-stats) is merged
+--    (client deploys on merge to main). Host: client.gershoncrm.com (the /api/* host other apps call).
+update client_platform_columns
+   set endpoint = 'https://client.gershoncrm.com/api/matrix-stats', source = 'live', active = true
+ where key = 'client';
+
+-- 6) Publish — run AFTER gershonconsulting/publish PR (nightly/2026-10-28-matrix-stats) is deployed
+--    (social repo, branch deploy/publish).
+update client_platform_columns
+   set endpoint = 'https://publish.gershon.ai/api/matrix-stats', source = 'live', active = true
+ where key = 'publish';
+
+-- 7) Social Tracking — run AFTER gershonconsulting/socialtracking PR (nightly/2026-10-28-matrix-stats)
+--    is deployed (social repo, branch deploy/socialtracking).
+update client_platform_columns
+   set endpoint = 'https://socialtracking.gershon.ai/api/matrix-stats', source = 'live', active = true
+ where key = 'socialtracking';
+
 -- ROLLBACK (any column): update client_platform_columns set endpoint = null, source = 'manual' where key = '<key>';
+-- ROLLBACK 5-7 (back to hidden): update client_platform_columns set endpoint = null, source = 'pending', active = false where key in ('client','publish','socialtracking');
