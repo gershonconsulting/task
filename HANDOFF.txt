@@ -67,6 +67,8 @@ CI            : .github/
   conflicted #10, built on main and carrying #8's one-score change).
 
 
+2026-11-06 nightly: Client Platform Matrix sent twice on 2026-11-02 (13:00 UTC pg_cron job 3, then 18:21 UTC a manual non-dry net.http_post right after a dry run) -> edge function now sends once per ISO week (Resend Idempotency-Key client-matrix-<YYYY>-W<ww>, force:true to override), v1.3.2 ✅ ready to test on preview (PR #13)
+
 2026-10-23 nightly — Cloudflare build fix (PR nightly/2026-10-23-task-build-fix)
 ----------------------------------------------------------------
 - ✅ Why every PR failed the "Cloudflare Pages" check (even e-mail-only
