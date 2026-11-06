@@ -11,7 +11,14 @@
 // as_of = today, so the fallback is never older than one week.
 // Every column gets a "source + freshness" line under the table.
 // Fired by pg_cron job "client-platform-matrix-weekly".
-// POST body: { secret, dry?: true (returns HTML, no send, no write-back), testTo?: "x@y" }
+// POST body: { secret, dry?: true (returns HTML, no send, no write-back), testTo?: "x@y",
+//              force?: true (send again this ISO week, bypassing the once-a-week guard) }
+//
+// v5.1 (2026-11-06): once per ISO week. A real send to report@ carries the Resend
+// Idempotency-Key "client-matrix-<YYYY>-W<ww>", so a second non-dry call in the same week
+// (e.g. a manual re-run after a config change, like 2026-11-02 18:21 UTC after the
+// 13:00 UTC cron send) is refused by Resend instead of mailing report@ twice.
+// testTo sends get no key (tests stay repeatable); force:true skips the key on purpose.
 //
 // v5 (2026-10-27): source + freshness footer per column, live write-back, as_of from feeds,
 // stale-manual warning (> 14 days). Source of truth for this function is now this repo.
@@ -53,6 +60,16 @@ function mark(c: Cell) {
   if (c.ok === null) return td(`<span style="display:inline-block;width:22px;height:22px;line-height:22px;border-radius:11px;background:#eef1f5;color:#9aa5b5;font-weight:700;font-size:13px">&ndash;</span>${note}`);
   const bg = c.ok ? "#e3f5ea" : "#fbe7e5", fg = c.ok ? "#138a4b" : "#c4352b";
   return td(`<span style="display:inline-block;width:22px;height:22px;line-height:22px;border-radius:11px;background:${bg};color:${fg};font-weight:700;font-size:13px">${c.ok ? "&#10003;" : "&#10007;"}</span>${note}`);
+}
+
+// ISO-8601 week of a UTC date, e.g. 2026-11-02 -> "2026-W45".
+function isoWeek(d = new Date()) {
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const y = t.getUTCFullYear();
+  const w = Math.ceil(((t.getTime() - Date.UTC(y, 0, 1)) / 86400000 + 1) / 7);
+  return `${y}-W${String(w).padStart(2, "0")}`;
 }
 
 function weekLabel() {
@@ -199,12 +216,17 @@ ${socialOnly.length ? `<div style="font-weight:800;margin:20px 0 6px">Other comp
     const key = await cfg("resend_api_key");
     if (!key) return json({ ok: false, error: "no resend key" });
     const to = body.testTo ? [body.testTo] : TO;
+    // Once per ISO week to report@ (Resend refuses a reused key with a different body: 409).
+    const idemKey = body.testTo || body.force ? null : `client-matrix-${isoWeek(sentAt)}`;
     const r = await fetch("https://api.resend.com/emails", {
       method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", ...(idemKey ? { "Idempotency-Key": idemKey } : {}) },
       body: JSON.stringify({ from: FROM, to, reply_to: REPLY_TO, subject: `Client Platform Matrix · ${period}`, html }),
     });
     const out = await r.json().catch(() => ({}));
+    if (r.status === 409 && idemKey) {
+      return json({ ok: false, skipped: true, error: `already sent this week (${idemKey}); pass force:true to send again`, out });
+    }
     if (!r.ok) return json({ ok: false, error: "resend " + r.status, out });
 
     // Write live values back into cells so next week's fallback is at most 7 days old.
@@ -229,7 +251,7 @@ ${socialOnly.length ? `<div style="font-weight:800;margin:20px 0 6px">Other comp
         } catch (_) { /* ignore */ }
       }));
     }
-    return json({ ok: true, id: out.id, to, people: clients.length, platforms: cols.length, live: cols.filter(isLive).map((c) => c.key), failed: liveErr, radar: radarErr || radar.length, writeBack });
+    return json({ ok: true, id: out.id, to, idempotencyKey: idemKey, people: clients.length, platforms: cols.length, live: cols.filter(isLive).map((c) => c.key), failed: liveErr, radar: radarErr || radar.length, writeBack });
   } catch (e) {
     return json({ ok: false, error: String(e) }, 200);
   }

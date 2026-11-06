@@ -27,3 +27,9 @@ Deployed v4 was only in Supabase; this folder is now the source of truth (v5).
 ## Test
 `POST /functions/v1/client-platform-matrix` with `{"secret":"<CRON_SECRET>","dry":true}` returns the HTML
 without sending or writing anything. `testTo` sends to one address and skips the write-back.
+
+## Once per week (v5.1, 2026-11-06)
+A real send to report@ uses the Resend `Idempotency-Key` `client-matrix-<YYYY>-W<ww>` (ISO week, UTC).
+A second non-dry call in the same week gets `{"ok":false,"skipped":true}` instead of a second e-mail.
+Resend keeps keys for 24 hours, which covers same-day re-runs (the 2026-11-02 duplicate was 5 h apart).
+`testTo` sends carry no key; `force:true` deliberately sends again.
