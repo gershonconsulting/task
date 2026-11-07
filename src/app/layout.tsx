@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import './unified-theme.css'
 
 export const metadata: Metadata = {
   title: 'Task by Gershon.AI',

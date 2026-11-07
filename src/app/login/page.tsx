@@ -52,23 +52,24 @@ function LoginInner() {
   return (
     <div className="min-h-screen grid md:grid-cols-2 bg-[#fafafa]">
       {/* brand panel */}
-      <div className="hidden md:flex flex-col justify-between bg-brand-600 text-white p-12">
+      {/* unified design (v1.4.0): light brand panel like linalysis.ai, red accents */}
+      <div className="hidden md:flex flex-col justify-between bg-gradient-to-b from-brand-50 to-[#fafafa] border-r border-[#e5e7eb] text-[#1d1d1f] p-12">
         <div className="flex items-center gap-3">
-          <svg viewBox="0 0 64 64" width="36" height="36"><rect width="64" height="64" rx="14" fill="#fff" /><path d="M18 33l9 9 19-20" fill="none" stroke="#FE1B04" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          <span className="text-2xl font-extrabold tracking-tight">Task <span className="font-semibold opacity-80">by Gershon.AI</span></span>
+          <svg viewBox="0 0 64 64" width="36" height="36"><rect width="64" height="64" rx="14" fill="#CC3333" /><path d="M18 33l9 9 19-20" fill="none" stroke="#fff" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <span className="text-2xl font-extrabold tracking-tight text-brand-600">Task <span className="font-semibold text-[#6e6e73] text-lg">by Gershon.AI</span></span>
         </div>
         <div>
-          <h2 className="text-4xl font-extrabold tracking-tight leading-tight">Know exactly what<br />you have to do today.</h2>
-          <p className="mt-4 text-white/85 max-w-md">Every client, every project, every task of the Gershon Consulting team — with what is late and what is next at the top.</p>
+          <h2 className="text-4xl font-extrabold tracking-tight leading-tight">Know exactly what<br />you have to do <span className="text-brand-600">today.</span></h2>
+          <p className="mt-4 text-[#6e6e73] max-w-md">Every client, every project, every task of the Gershon Consulting team — with what is late and what is next at the top.</p>
         </div>
-        <p className="text-xs text-white/70">gershon.ai</p>
+        <p className="text-xs text-[#6e6e73]">gershon.ai</p>
       </div>
 
       {/* sign-in */}
-      <div className="flex flex-col items-center justify-center px-6 py-12">
-        <div className="w-full max-w-sm">
+      <div className="flex flex-col items-center justify-center px-4 sm:px-6 py-12 min-w-0">
+        <div className="w-full max-w-sm bg-white border border-[#e5e7eb] rounded-xl shadow-sm p-6 sm:p-7">
           <div className="md:hidden flex items-center gap-2.5 mb-8">
-            <svg viewBox="0 0 64 64" width="32" height="32"><rect width="64" height="64" rx="14" fill="#FE1B04" /><path d="M18 33l9 9 19-20" fill="none" stroke="#fff" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <svg viewBox="0 0 64 64" width="32" height="32"><rect width="64" height="64" rx="14" fill="#CC3333" /><path d="M18 33l9 9 19-20" fill="none" stroke="#fff" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" /></svg>
             <span className="text-xl font-extrabold text-brand-600">Task <span className="text-[#6e6e73] font-semibold text-base">by Gershon.AI</span></span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Sign in</h1>

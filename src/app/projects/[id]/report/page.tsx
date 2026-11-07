@@ -58,7 +58,7 @@ export default async function ReportPage(props: { params: Promise<{ id: string }
           <PrintButton />
         </div>
         <div className="flex items-center gap-2 mb-1">
-          <svg viewBox="0 0 64 64" width="22" height="22"><rect width="64" height="64" rx="14" fill="#FE1B04" /><path d="M18 33l9 9 19-20" fill="none" stroke="#fff" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <svg viewBox="0 0 64 64" width="22" height="22"><rect width="64" height="64" rx="14" fill="#CC3333" /><path d="M18 33l9 9 19-20" fill="none" stroke="#fff" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" /></svg>
           <span className="text-[12px] font-semibold text-[#6e6e73]">Gershon Consulting · Status report</span>
         </div>
         <h1 className="text-[26px] font-extrabold tracking-tight">{cleanClient(p.company_name)}</h1>

@@ -1,0 +1,60 @@
+/* =====================================================================
+   Task - unified Gershon design (v1.4.0, 2026-10-22)
+   Decision 2026-10-13: every Gershon app looks like Linalysis (the master
+   design) and the main colour everywhere is the Gershon.ai red #CC3333.
+   Same tokens as Radar (unified-theme.css, v1.15.0) and Pulse (PR #1).
+
+   Most of the re-skin happens through Tailwind: the `brand` scale (and
+   `indigo`, which is remapped to it) is now the #CC3333 scale, so every
+   bg-brand-600 / text-brand-600 / indigo-* class turns the unified red.
+   This file only adds what utilities cannot express globally:
+   tokens, red focus rings, form-control accents and the phone
+   horizontal-scroll guard. It is imported after globals.css in layout.tsx.
+
+   Semantic status colours (green = done, amber = due today / in progress,
+   red-* = overdue, slate = not started) are deliberately NOT touched.
+   ===================================================================== */
+
+:root {
+  --gx-red: #CC3333;
+  --gx-red-dark: #a8281f;
+  --gx-red-light: #fdf2f2;
+  --gx-red-line: #f3caca;
+  --gx-text: #1d1d1f;
+  --gx-muted: #6e6e73;
+  --gx-border: #e5e7eb;
+  --gx-bg: #fafafa;
+  --gx-radius: 12px;
+  --gx-ring: 0 0 0 3px rgba(204, 51, 51, .15);
+}
+
+/* ---------- Phone: never scroll sideways ----------
+   Wide content (client board, tables) scrolls inside its own
+   overflow-x-auto box; the page itself must not. `clip` (not `hidden`)
+   so the sticky sidebar / topbar keep working. */
+html, body { max-width: 100%; overflow-x: clip; }
+main { min-width: 0; }
+
+/* ---------- Focus: red ring everywhere (keyboard + form fields) ---------- */
+:where(a, button, summary, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid var(--gx-red);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea):focus {
+  outline: none;
+  border-color: var(--gx-red);
+  box-shadow: var(--gx-ring);
+}
+input[type="checkbox"], input[type="radio"], progress, input[type="range"] { accent-color: var(--gx-red); }
+
+/* ---------- Text selection + links inside prose ---------- */
+::selection { background: var(--gx-red-line); color: var(--gx-text); }
+
+/* ---------- Native <details> cards (By Client board): no browser marker ---------- */
+summary::-webkit-details-marker { display: none; }
+
+/* ---------- Print (project status report): keep the red, drop the shell ---------- */
+@media print {
+  html, body { overflow: visible; background: #fff; }
+}
