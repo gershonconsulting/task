@@ -67,6 +67,18 @@ CI            : .github/
   conflicted #10, built on main and carrying #8's one-score change).
 
 
+2026-11-07 nightly — client-platform-matrix: repo = deployed v5 (PR nightly/2026-11-07-matrix-v5-source)
+----------------------------------------------------------------
+- ✅ supabase/functions/client-platform-matrix/index.ts is now byte-for-byte the
+  DEPLOYED v5 (Supabase, deployed 2026-11-03, "data engine + relay":
+  format:"json" for health.gershon.ai, html+subject relay send, legacy dry/fallback).
+  The repo held the older 2026-10-27 code (write-back + per-column source footer),
+  which was never what ran. No behaviour change: nothing to deploy for this PR.
+- ✅ deno check passes; mocked run: json / relay / legacy / dry / 401 all answer as live.
+- ❌ PR #13 (once-per-week key) was built on the old repo code — deploying it would
+  REMOVE the json + relay paths and break health.gershon.ai/matrix. Do NOT deploy #13;
+  use nightly/2026-11-07-matrix-idempotency (stacked on this PR) instead.
+
 2026-10-23 nightly — Cloudflare build fix (PR nightly/2026-10-23-task-build-fix)
 ----------------------------------------------------------------
 - ✅ Why every PR failed the "Cloudflare Pages" check (even e-mail-only

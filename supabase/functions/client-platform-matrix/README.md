@@ -3,6 +3,10 @@
 Weekly "Client Platform Matrix" email, Mondays 13:00 UTC (pg_cron job `client-platform-matrix-weekly`).
 Deployed v4 was only in Supabase; this folder is now the source of truth (v5).
 
+**2026-11-07:** `index.ts` here = the deployed v5 (2026-11-03, data engine for health.gershon.ai +
+relay send). Body: `{secret, format:"json"}` -> data; `{secret, html, subject, testTo?}` -> relay send
+("GC Health"); `{secret, dry?, testTo?}` -> legacy self-built email. Always edit this file, then deploy it.
+
 ## Live feed contract (same on every app)
 `POST https://<app>/api/matrix-stats`
 - body `{"secret":"…","people":[{"key":"1","company":"Valos","emails":["a@valos.it"]}]}`
