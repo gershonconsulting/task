@@ -9,6 +9,15 @@
 // POST body: { secret, format?: "json" }                         -> structured data for health.gershon.ai
 //            { secret, html, subject, testTo? }                  -> send health.gershon.ai's email (relay)
 //            { secret, dry?: true, testTo? }                     -> legacy self-built email (kept as fallback)
+//            force?: true on either send path                    -> send again this ISO week (bypasses the guard)
+//
+// v5.1 (2026-11-07, replaces PR #13 which was built on pre-v5 code): once per ISO week.
+// A real send to report@ (relay or legacy) carries the Resend Idempotency-Key
+// "client-matrix-<YYYY>-W<ww>" (ISO week, UTC). The relay and the legacy fallback share the
+// key, so a fallback run after a health.gershon.ai send (or a manual re-run, like 2026-11-02
+// 18:21 UTC after the 13:00 UTC cron send) is refused by Resend instead of mailing report@ twice.
+// Resend keeps a key for 24 h, so this guards same-day re-runs, not a whole week.
+// testTo sends get no key (tests stay repeatable); force:true skips the key on purpose.
 
 const SB_URL = Deno.env.get("SUPABASE_URL")!;
 const SB_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -46,23 +55,37 @@ function mark(c: Cell) {
   return td(`<span style="display:inline-block;width:22px;height:22px;line-height:22px;border-radius:11px;background:${bg};color:${fg};font-weight:700;font-size:13px">${c.ok ? "&#10003;" : "&#10007;"}</span>${note}`);
 }
 
+// ISO-8601 week of a UTC date, e.g. 2026-11-02 -> "2026-W45".
+function isoWeek(d = new Date()) {
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const y = t.getUTCFullYear();
+  const w = Math.ceil(((t.getTime() - Date.UTC(y, 0, 1)) / 86400000 + 1) / 7);
+  return `${y}-W${String(w).padStart(2, "0")}`;
+}
+
 function weekLabel() {
   const ny = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
   ny.setDate(ny.getDate() - ((ny.getDay() + 6) % 7));
   return "week of " + ny.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-async function sendMail(to: string[], subject: string, html: string, from: string) {
+async function sendMail(to: string[], subject: string, html: string, from: string, idemKey: string | null = null) {
   const key = await cfg("resend_api_key");
   if (!key) return json({ ok: false, error: "no resend key" });
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", ...(idemKey ? { "Idempotency-Key": idemKey } : {}) },
     body: JSON.stringify({ from, to, reply_to: REPLY_TO, subject, html }),
   });
   const out = await r.json().catch(() => ({}));
+  // Resend answers 409 when the key was already used this window with a different body.
+  if (r.status === 409 && idemKey) {
+    return json({ ok: false, skipped: true, error: `already sent this week (${idemKey}); pass force:true to send again`, out });
+  }
   if (!r.ok) return json({ ok: false, error: "resend " + r.status, out });
-  return json({ ok: true, id: (out as any).id, to });
+  return json({ ok: true, id: (out as any).id, to, idempotencyKey: idemKey });
 }
 
 Deno.serve(async (req) => {
@@ -74,10 +97,13 @@ Deno.serve(async (req) => {
   // Test sends only ever go to an internal address.
   if (body.testTo && !/^[^@\s]+@gershonconsulting\.com$/i.test(String(body.testTo))) return json({ ok: false, error: "testTo must be an @gershonconsulting.com address" }, 400);
 
+  // Once per ISO week to report@; test sends and force:true carry no key.
+  const idemKey = body.testTo || body.force ? null : `client-matrix-${isoWeek()}`;
+
   // Relay: health.gershon.ai built the email; this function only sends it.
   if (typeof body.html === "string" && typeof body.subject === "string") {
     const to = body.testTo ? [String(body.testTo)] : TO;
-    return sendMail(to, body.subject.slice(0, 200), body.html, FROM_HEALTH);
+    return sendMail(to, body.subject.slice(0, 200), body.html, FROM_HEALTH, idemKey);
   }
 
   try {
@@ -190,7 +216,7 @@ ${socialOnly.length ? `<div style="font-weight:800;margin:20px 0 6px">Other comp
 
     if (body.dry) return new Response(html, { headers: { "Content-Type": "text/html" } });
     const to = body.testTo ? [body.testTo] : TO;
-    return sendMail(to, `Client Platform Matrix · ${period}`, html, FROM);
+    return sendMail(to, `Client Platform Matrix · ${period}`, html, FROM, idemKey);
   } catch (e) {
     return json({ ok: false, error: String(e) }, 200);
   }

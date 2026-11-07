@@ -31,3 +31,9 @@ relay send). Body: `{secret, format:"json"}` -> data; `{secret, html, subject, t
 ## Test
 `POST /functions/v1/client-platform-matrix` with `{"secret":"<CRON_SECRET>","dry":true}` returns the HTML
 without sending or writing anything. `testTo` sends to one address and skips the write-back.
+
+## Once per week (v5.1, 2026-11-07, replaces PR #13)
+A real send to report@ (relay or legacy) uses the Resend `Idempotency-Key` `client-matrix-<YYYY>-W<ww>` (ISO week, UTC).
+A second non-dry send in the same window gets `{"ok":false,"skipped":true}` instead of a second e-mail.
+Resend keeps keys for 24 hours, which covers same-day re-runs (the 2026-11-02 duplicate was 5 h apart).
+`testTo` sends carry no key; `force:true` deliberately sends again.
