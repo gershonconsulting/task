@@ -9,10 +9,10 @@ Deployed v4 was only in Supabase; this folder is now the source of truth (v5).
 - auth: the app stores only `sha256(secret)` = `7031a38b…77569`; plain value is
   `cc_health_config.matrix_stats_secret`. Wrong secret -> `401 {"ok":false}`.
 - reply `{"ok":true,"platform":"…","as_of":"ISO","results":[{"key","ok","note"}]}` (Social adds `others`).
-- Client / Publish / Social Tracking also accept the secret as `Authorization: Bearer <secret>` (curl tests).
+- Client / Publish / Social Tracking / Events / ICP also accept the secret as `Authorization: Bearer <secret>` (curl tests).
 - A column is live when `client_platform_columns.endpoint` is set. No redeploy needed.
 
-| Column | Feed | State 2026-10-27 |
+| Column | Feed | State 2026-10-30 |
 |---|---|---|
 | Radar | radar project RPC `client_platform_stats` | live |
 | Linalysis | linalysis.net/api/matrix-stats | live |
@@ -22,7 +22,8 @@ Deployed v4 was only in Supabase; this folder is now the source of truth (v5).
 | Client | client.gershoncrm.com/api/matrix-stats (KV COMPANIES_KV, client numbers) | client PR, then SQL block 5 (sets active) |
 | Publish | publish.gershon.ai/api/matrix-stats (Neon, ScheduledPost) | publish PR, then SQL block 6 |
 | Social Tracking | socialtracking.gershon.ai/api/matrix-stats (Neon, attainment) | socialtracking PR, then SQL block 7 |
-| Events, ICP | none yet | inactive |
+| Events | events.gershon.ai/api/matrix-stats (KV STORE, clients + graded events) | events-gershon-ai PR, then SQL block 8 |
+| ICP | icp.gershon.ai/api/matrix-stats (KV STORE, saved 12-point reports) | ICP PR + Deploy Hook, then SQL block 9 |
 
 ## Test
 `POST /functions/v1/client-platform-matrix` with `{"secret":"<CRON_SECRET>","dry":true}` returns the HTML
