@@ -67,6 +67,40 @@ CI            : .github/
   conflicted #10, built on main and carrying #8's one-score change).
 
 
+2026-11-07 nightly — Client Platform Matrix, Monday 2026-11-09 13:00 UTC (PR nightly/2026-11-07-matrix-health)
+----------------------------------------------------------------
+- What runs: pg_cron job 3 client-platform-matrix-weekly ('0 13 * * 1', active)
+  -> POST https://health.gershon.ai/api/matrix-report {secret}. That will be the
+  FIRST cron run against health (the 11-02 13:00 run still hit the task function).
+- ✅ health.gershon.ai is LIVE (Cloudflare, not in the Workers list, so it is
+  probably Pages). GET /api/matrix-report -> 405 {"ok":false,"error":"POST only"},
+  so the route exists. "/" -> 401 (login gate).
+- ✅ The cron secret = cc_health_config.matrix_cron_secret (set 2026-11-03 01:03 UTC),
+  which is what task function v5 checks.
+- ✅ Task function client-platform-matrix is v5 (deployed 2026-11-03 01:04 UTC), the
+  "data engine + relay" version. On 11-03 at 01:09 UTC health (Cloudflare egress IP, no
+  user agent, 82-byte {secret, format:"json"} body) called it and got 200.
+  So health -> task data works.
+- ❌ Not proven: health -> relay send ({html, subject}). No relay call has ever been logged,
+  so health has never sent an e-mail end to end. Nothing watches the answer either: pg_net is
+  fire-and-forget, the job shows "succeeded" just for queuing, and net._http_response
+  rows are kept for ~6 h only.
+- ❌ health's source code is NOT on GitHub (no repo, and "matrix-report" / "health.gershon.ai"
+  find 0 hits in the gershonconsulting org). It lives only in Cloudflare. Ariel: put it
+  in a repo.
+- ❌ DRIFT: the deployed v5 is NOT the code in supabase/functions/client-platform-matrix
+  on main (that is the older self-sending v5). PR #13 (idempotency key) is built on the
+  repo copy, so deploying #13 as it stands REMOVES the {format:"json"} and relay paths
+  and breaks health. #13 must be rebased onto the deployed v5 (put that in the repo first).
+- Prepared, NOT applied: supabase/sql/2026-11-07_matrix_health_fallback.sql keeps job 3
+  on health (secret read from config, request id logged in matrix_send_log) and adds
+  'client-platform-matrix-fallback' Mon 13:15 UTC. It calls the task function's own
+  send if health's answer is missing, non-2xx or not ok:true.
+- Options for Olivier: A) do nothing, trust health (one test relay send to an
+  @gershonconsulting.com testTo before Monday, run by Ariel); B) apply the fallback
+  (Ariel); C) point job 3 back at the task function for 11-09 and move to health once
+  health is in a repo and has passed a test.
+
 2026-10-23 nightly — Cloudflare build fix (PR nightly/2026-10-23-task-build-fix)
 ----------------------------------------------------------------
 - ✅ Why every PR failed the "Cloudflare Pages" check (even e-mail-only
