@@ -26,11 +26,29 @@ export type ReportSummary = {
   headerLine: string     // shown in the email header card
 }
 
-export function summarize(opts: { score: number; max?: number; nothingHappened: boolean; todayYmd: string; reportedYmd: string }): ReportSummary {
+// The "Overdue tasks" measure. Any overdue task is a ✗ (red): "43 → 43" is not progress.
+// ✓ only when overdue is 0 (whether it was already 0 or just came down to 0).
+export function overdueCheck(overdue: number, prevOverdue: number | null): { ok: boolean; why: string; trend: string } {
+  const ok = overdue === 0
+  const trend = prevOverdue === null ? ''
+    : overdue > prevOverdue ? 'up from ' + prevOverdue
+    : overdue < prevOverdue ? 'down from ' + prevOverdue
+    : 'unchanged since the last report'
+  const why = ok ? ''
+    : prevOverdue === null ? overdue + ' task(s) are overdue.'
+    : overdue > prevOverdue ? 'Overdue tasks went up to ' + overdue + ' (from ' + prevOverdue + ').'
+    : overdue < prevOverdue ? 'Overdue tasks went down to ' + overdue + ' (from ' + prevOverdue + '), but not to 0 yet.'
+    : 'Still ' + overdue + ' overdue task(s), unchanged since the last report.'
+  return { ok, why, trend }
+}
+
+export function summarize(opts: { score: number; max?: number; nothingHappened: boolean; todayYmd: string; reportedYmd: string; overdue?: number }): ReportSummary {
   const max = opts.max ?? 6
   const quiet = isQuietDay(opts.todayYmd, opts.reportedYmd)
   const alarm = opts.nothingHappened && !quiet
-  const scoreText = 'Progress ' + opts.score + '/' + max
+  const overdue = opts.overdue ?? 0
+  // The overdue count is part of the headline so it can never read better than the tiles below it.
+  const scoreText = 'Progress ' + opts.score + '/' + max + (overdue > 0 ? ' · ' + overdue + ' overdue' : '')
   return {
     score: opts.score,
     max,
