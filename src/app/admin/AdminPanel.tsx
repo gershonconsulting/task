@@ -192,7 +192,7 @@ export default function AdminPanel({ selfId }: { selfId: string }) {
             {busy === 'create' ? 'Creating…' : 'Create user'}
           </button>
           <label className="inline-flex items-center gap-2 text-sm text-[#3a3a3c]">
-            <input type="checkbox" checked={sendEmail} onChange={e => setSendEmail(e.target.checked)} className="accent-[#FE1B04]" />
+            <input type="checkbox" checked={sendEmail} onChange={e => setSendEmail(e.target.checked)} className="accent-[#CC3333]" />
             E-mail the invite to their work address
           </label>
         </div>
