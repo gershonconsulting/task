@@ -67,6 +67,21 @@ CI            : .github/
   conflicted #10, built on main and carrying #8's one-score change).
 
 
+2026-11-07 nightly — Client Matrix once per ISO week on v5 (PR nightly/2026-11-07-matrix-idempotency, replaces #13)
+----------------------------------------------------------------
+- ✅ #13's Resend Idempotency-Key "client-matrix-<YYYY>-W<ww>" (ISO week, UTC) re-applied
+  onto deployed v5, nothing else. format:"json" and the health.gershon.ai relay are kept.
+  The relay and the legacy fallback send share the key, so a fallback run (PR #14) or a
+  manual re-run after the health send is refused (409 -> {ok:false, skipped:true}).
+  testTo sends carry no key; force:true sends again on purpose.
+- ✅ deno check passes; mocked run: key header on relay + legacy, none on testTo / force,
+  409 -> skipped, json / dry / 401 unchanged. isoWeek checked on 2026-11-02 (W45),
+  2026-11-09 (W46), 2027-01-03 (2026-W53), 2027-01-04 (2027-W01).
+- ❌ Resend keeps a key for 24 h only: this stops same-day duplicates (the 2026-11-02
+  case was 5 h apart), not a re-send 2+ days later in the same week.
+- ❌ Not deployed. Deploy order: merge PR #15 first, then this one, then deploy
+  client-platform-matrix from this folder. Close #13 without deploying it.
+
 2026-11-07 nightly — client-platform-matrix: repo = deployed v5 (PR nightly/2026-11-07-matrix-v5-source)
 ----------------------------------------------------------------
 - ✅ supabase/functions/client-platform-matrix/index.ts is now byte-for-byte the
