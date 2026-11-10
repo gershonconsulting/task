@@ -67,6 +67,26 @@ CI            : .github/
   conflicted #10, built on main and carrying #8's one-score change).
 
 
+2026-11-07 nightly — Task daily e-mail: overdue is red unless 0 (PR nightly/2026-11-07-task-daily-email)
+----------------------------------------------------------------
+- ✅ Bug: the 2026-11-05 report ("No activity · Progress 1/6") showed "Overdue tasks
+  43 -> 43" with a green ✓ (rule was overdue <= previous). The deployed Pages build
+  matches main (checked against the HTML of the e-mail Resend actually sent on 11-06),
+  so the fix is on main's src/app/api/cron/daily-report/route.ts.
+- ✅ Overdue measure: ✓ only when overdue = 0 (already 0 or just dropped to 0); any
+  overdue > 0 is a red ✗ with the reason (up / unchanged / down but not 0) in
+  "What did not move". Logic: overdueCheck() in src/lib/dailyReportSummary.ts.
+- ✅ Headline = tiles: subject + header now say "Progress 0/6 · 43 overdue" (the 11-05
+  replay). Green "The system did its job" banner only when nothing is overdue; the
+  overdue card and the "Overdue tasks" line in "Where the app stands" are red.
+- ✅ E-mail HTML moved to src/lib/dailyReportEmail.ts (pure, no Next imports) so it
+  can be rendered with sample data. tsc --noEmit, next build and
+  @cloudflare/next-on-pages all pass. 5 sample cases rendered
+  (43->43, 43->40, 40->44, 3->0, 0->0) - preview published as a Claude artifact.
+- ❌ Not deployed (merging to main deploys via deploy.yml). Test after merge:
+  GET https://task.gershon.ai/api/cron/daily-report?preview=1 with the CRON_SECRET
+  bearer shows the e-mail without sending it.
+
 2026-11-07 nightly — Client Matrix once per ISO week on v5 (PR nightly/2026-11-07-matrix-idempotency, replaces #13)
 ----------------------------------------------------------------
 - ✅ #13's Resend Idempotency-Key "client-matrix-<YYYY>-W<ww>" (ISO week, UTC) re-applied

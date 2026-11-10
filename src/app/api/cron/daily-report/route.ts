@@ -4,7 +4,8 @@ import { siteUrl } from '@/lib/site'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { supabaseAdmin } from '@/lib/supabaseServer'
-import { summarize, type ReportSummary } from '@/lib/dailyReportSummary'
+import { summarize, overdueCheck } from '@/lib/dailyReportSummary'
+import { buildEmail, esc, longDate, type Check, type DayCounts, type Snapshot, type StuckTask } from '@/lib/dailyReportEmail'
 
 // Daily "what happened yesterday" report for Task by Gershon.AI.
 // Triggered by .github/workflows/daily-report.yml at 11:00 UTC (07:00 ET) with the CRON_SECRET
@@ -28,17 +29,8 @@ type Task = { id: string; name: string; status: string | null; assigned_to: stri
 type Project = { id: string; company_name: string; status: string; created_at: string; updated_at: string }
 type Client = { id: string; name: string; created_at: string }
 
-type Snapshot = { date: string; run_at: string; tasks_total: number; tasks_done: number; projects_total: number; overdue: number; pct: number }
-type DayCounts = { projectsCreated: number; tasksCreated: number; tasksTouched: number; tasksCompleted: number; clientsAdded: number }
-type Check = { label: string; v: number; p: number; ok: boolean; why: string; href: string }
-type StuckTask = { name: string; owner: string | null; due: string; daysLate: number; project: string | null; href: string }
-
 function readEnv(name: string): string | undefined {
   try { return (getRequestContext().env as Record<string, string>)[name] } catch { return process.env[name] }
-}
-
-function esc(s: unknown): string {
-  return String(s ?? '').replace(/[&<>]/g, c => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;'))
 }
 
 // YYYY-MM-DD for an instant, in the report timezone.
@@ -50,10 +42,6 @@ function addDays(ymd: string, n: number): string {
   const d = new Date(ymd + 'T12:00:00Z')
   d.setUTCDate(d.getUTCDate() + n)
   return d.toISOString().slice(0, 10)
-}
-
-function longDate(ymd: string): string {
-  return new Date(ymd + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
 }
 
 function onDay(ts: string | null | undefined, ymd: string): boolean {
@@ -120,13 +108,15 @@ async function handle(req: NextRequest, preview: boolean) {
   // Progress score, 6 measures, 1 point each.
   // `why` explains a ✗ in plain words; `href` is where to act on it in the app.
   const base = siteUrl()
+  const od = overdueCheck(overdue, prev ? prev.overdue : null)
   const checks: Check[] = [
     { label: 'Projects created', v: y.projectsCreated, p: d.projectsCreated, ok: y.projectsCreated > 0, why: 'No new project was opened.', href: base + '/projects' },
     { label: 'Tasks created', v: y.tasksCreated, p: d.tasksCreated, ok: y.tasksCreated > 0, why: 'No task was added to any project.', href: base + '/tasks' },
     { label: 'Tasks completed', v: y.tasksCompleted, p: d.tasksCompleted, ok: y.tasksCompleted > 0, why: 'No task was marked done (' + (tasksTotal - tasksDone) + ' still open).', href: base + '/tasks' },
     { label: 'Tasks touched', v: y.tasksTouched, p: d.tasksTouched, ok: y.tasksTouched > 0, why: 'No task was edited, re-dated or re-assigned.', href: base + '/tasks' },
     { label: 'Completion %', v: pct, p: prev ? prev.pct : pct, ok: prev ? pct > prev.pct : false, why: 'Overall completion stayed at ' + pct + '% (' + tasksDone + '/' + tasksTotal + ').', href: base + '/dashboard' },
-    { label: 'Overdue tasks', v: overdue, p: prev ? prev.overdue : overdue, ok: prev ? overdue <= prev.overdue : overdue === 0, why: 'Overdue tasks went up to ' + overdue + '.', href: base + '/tasks' },
+    // ✓ only at 0 overdue: a flat or slightly lower non-zero count is still a red ✗.
+    { label: 'Overdue tasks', v: overdue, p: prev ? prev.overdue : overdue, ok: od.ok, why: od.why, href: base + '/tasks' },
   ]
   const score = checks.filter(c => c.ok).length
 
@@ -148,16 +138,15 @@ async function handle(req: NextRequest, preview: boolean) {
   // Did the system do its daily job?
   const nothingHappened = y.projectsCreated + y.tasksCreated + y.tasksTouched + y.clientsAdded === 0
   const missedRuns = prev ? Math.max(0, daysBetween(prev.date, todayYmd) - 1) : 0
-  const overdueGrew = prev ? overdue > prev.overdue : false
 
   // One summary object drives the subject, the header and the body so they can never disagree.
-  const summary = summarize({ score, nothingHappened, todayYmd, reportedYmd: yYmd })
+  const summary = summarize({ score, nothingHappened, todayYmd, reportedYmd: yYmd, overdue })
 
   const warnings: string[] = []
   if (missedRuns > 0) warnings.push('The daily report did not run for ' + missedRuns + ' day(s) — last run was ' + esc(prev!.date) + '. The scheduled job is failing or disabled.')
   if (summary.alarm) warnings.push('Nothing moved on ' + longDate(yYmd) + ': no project, task or client was created, updated or completed.' + (daysSinceWrite !== null ? ' The last change of any kind was ' + daysSinceWrite + ' day(s) ago.' : ''))
 
-  const html = buildEmail({ yYmd, dYmd, y, d, checks, score, summary, pct, tasksDone, tasksTotal, overdue, overdueGrew, activeProjects, clientsTotal: allClients.length, warnings, prev, daysSinceWrite, stuck })
+  const html = buildEmail({ base, yYmd, y, checks, summary, pct, tasksDone, tasksTotal, overdue, overdueTrend: od.trend, activeProjects, clientsTotal: allClients.length, warnings, daysSinceWrite, stuck })
   const subject =
     (warnings.length ? '⚠ ' : '') +
     'Task — Daily report, ' + longDate(yYmd).replace(/^\w+, /, '') + ' — ' +
@@ -209,93 +198,3 @@ async function handle(req: NextRequest, preview: boolean) {
 
 export async function POST(req: NextRequest) { return handle(req, false) }
 export async function GET(req: NextRequest) { return handle(req, new URL(req.url).searchParams.get('preview') === '1') }
-
-function buildEmail(a: {
-  yYmd: string; dYmd: string
-  y: DayCounts; d: DayCounts
-  checks: Check[]
-  score: number; summary: ReportSummary; pct: number; tasksDone: number; tasksTotal: number; overdue: number; overdueGrew: boolean
-  activeProjects: number; clientsTotal: number; warnings: string[]; prev: Snapshot | null; daysSinceWrite: number | null
-  stuck: StuckTask[]
-}): string {
-  const link = 'color:#1f6f5c;text-decoration:underline;'
-  // Which of the 6 measures did not move, why, and where to fix it.
-  const failed = a.checks.filter(c => !c.ok)
-  const failedHtml = failed.length
-    ? "<div style='background:#ffffff;border-left:5px solid #c0392b;border-radius:6px;padding:20px 24px;margin-bottom:16px;'>" +
-      "<div style='font-size:16px;font-weight:700;color:#12352c;margin-bottom:10px;'>What did not move (" + failed.length + " of " + a.checks.length + ")</div>" +
-      "<ol style='margin:0;padding-left:20px;font-size:14px;color:#1a1a1a;line-height:1.6;'>" +
-      failed.map(c => "<li><b>" + esc(c.label) + "</b> — " + esc(c.why) + " <a href='" + esc(c.href) + "' style='" + link + "'>Open</a></li>").join('') +
-      "</ol></div>"
-    : ''
-  const stuckHtml = a.stuck.length
-    ? "<div style='background:#ffffff;border-radius:6px;padding:20px 24px;margin-bottom:16px;'>" +
-      "<div style='font-size:16px;font-weight:700;color:#12352c;margin-bottom:4px;'>Most overdue open tasks — move these next</div>" +
-      "<div style='font-size:13px;color:#5b6b66;margin-bottom:10px;'>Showing " + a.stuck.length + " of " + a.overdue + " overdue. Each link opens the task's project.</div>" +
-      "<table style='width:100%;border-collapse:collapse;font-size:14px;'>" +
-      "<tr style='background:#f0f4f3;'><th align='left' style='padding:8px 10px;color:#12352c;'>Task</th>" +
-      "<th align='left' style='padding:8px 10px;color:#12352c;'>Owner</th>" +
-      "<th align='right' style='padding:8px 10px;color:#12352c;'>Late</th></tr>" +
-      a.stuck.map(s =>
-        "<tr><td style='padding:8px 10px;border-bottom:1px solid #e6ebe9;'><a href='" + esc(s.href) + "' style='" + link + "'>" + esc(s.name) + "</a>" +
-        (s.project ? "<div style='font-size:12px;color:#8a9995;'>" + esc(s.project) + "</div>" : '') + "</td>" +
-        "<td style='padding:8px 10px;border-bottom:1px solid #e6ebe9;'>" + esc(s.owner || 'Unassigned') + "</td>" +
-        "<td align='right' style='padding:8px 10px;border-bottom:1px solid #e6ebe9;color:#c0392b;white-space:nowrap;'>" + s.daysLate + " d</td></tr>").join('') +
-      "</table></div>"
-    : ''
-  const card = 'background:#ffffff;border-left:5px solid #1f6f5c;border-radius:6px;padding:20px 24px;margin-bottom:16px;'
-  const rows = a.checks.map(c =>
-    "<tr>" +
-    "<td style='padding:8px 10px;border-bottom:1px solid #e6ebe9;'>" + esc(c.label) + "</td>" +
-    "<td align='center' style='padding:8px 10px;border-bottom:1px solid #e6ebe9;'>" + c.v + "</td>" +
-    "<td align='center' style='padding:8px 10px;border-bottom:1px solid #e6ebe9;color:#8a9995;'>" + c.p + "</td>" +
-    "<td align='center' style='padding:8px 10px;border-bottom:1px solid #e6ebe9;color:" + (c.ok ? '#1f6f5c' : '#c0392b') + ";'>" + (c.ok ? '&#10003;' : '&#10007;') + "</td>" +
-    "</tr>").join('')
-
-  const warnHtml = a.warnings.length
-    ? "<div style='background:#fdecea;border-left:5px solid #c0392b;border-radius:6px;padding:18px 24px;margin-bottom:16px;'>" +
-      "<div style='font-size:17px;font-weight:700;color:#8e2318;margin-bottom:6px;'>&#9888; BIG WARNING — the system did not do its daily job</div>" +
-      "<div style='font-size:14px;color:#5a1c14;line-height:1.55;'>" + a.warnings.map(w => '&bull; ' + w).join('<br>') + "</div></div>"
-    : "<div style='background:#eaf6f1;border-left:5px solid #1f6f5c;border-radius:6px;padding:18px 24px;margin-bottom:16px;'>" +
-      "<div style='font-size:17px;font-weight:700;color:#14503f;margin-bottom:6px;'>&#10003; The system did its job</div>" +
-      "<div style='font-size:14px;color:#1d4a3d;line-height:1.55;'>" + a.y.tasksCompleted + " task(s) completed, " + a.y.tasksCreated + " created, " + a.y.projectsCreated + " new project(s) on " + longDate(a.yYmd) + ".</div></div>"
-
-  const overdueHtml = a.overdue > 0
-    ? "<div style='background:#fff8e6;border-left:5px solid #d68910;border-radius:6px;padding:18px 24px;margin-bottom:16px;'>" +
-      "<div style='font-size:16px;font-weight:700;color:#7d5109;margin-bottom:6px;'>" + a.overdue + " overdue task(s)" + (a.overdueGrew ? ' — up from ' + (a.prev ? a.prev.overdue : 0) + ' yesterday' : '') + "</div>" +
-      "<div style='font-size:14px;color:#6b4708;'>Open tasks whose due date has already passed. Clear or re-date them in the app.</div></div>"
-    : ''
-
-  return "<div style='margin:0;padding:24px;background:#f4f6f5;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#1a1a1a;'>" +
-    "<div style='max-width:640px;margin:0 auto;'>" +
-    "<div style='" + card + "'>" +
-      "<div style='font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#5b6b66;margin-bottom:6px;'>Daily progress report</div>" +
-      "<div style='font-size:22px;font-weight:700;color:#12352c;'>Task — what happened yesterday</div>" +
-      "<div style='font-size:14px;color:#5b6b66;margin-top:4px;'>" + longDate(a.yYmd) + " &middot; <b>" + esc(a.summary.headerLine) + "</b></div>" +
-    "</div>" +
-    warnHtml +
-    (a.summary.quietNote ? "<div style='background:#f0f4f3;border-radius:6px;padding:12px 24px;margin-bottom:16px;font-size:14px;color:#5b6b66;'>" + esc(a.summary.quietNote) + "</div>" : '') +
-    "<div style='background:#ffffff;border-radius:6px;padding:20px 24px;margin-bottom:16px;'>" +
-      "<div style='font-size:16px;font-weight:700;color:#12352c;margin-bottom:12px;'>Progress score: " + a.summary.score + " / " + a.summary.max + "</div>" +
-      "<table style='width:100%;border-collapse:collapse;font-size:14px;'>" +
-      "<tr style='background:#f0f4f3;'><th align='left' style='padding:8px 10px;color:#12352c;'>Measure</th>" +
-      "<th align='center' style='padding:8px 10px;color:#12352c;'>Yesterday</th>" +
-      "<th align='center' style='padding:8px 10px;color:#12352c;'>Previous</th>" +
-      "<th align='center' style='padding:8px 10px;color:#12352c;'>&nbsp;</th></tr>" + rows + "</table>" +
-    "</div>" +
-    failedHtml +
-    overdueHtml +
-    stuckHtml +
-    "<div style='background:#ffffff;border-radius:6px;padding:20px 24px;margin-bottom:16px;'>" +
-      "<div style='font-size:16px;font-weight:700;color:#12352c;margin-bottom:10px;'>Where the app stands today</div>" +
-      "<table style='width:100%;border-collapse:collapse;font-size:14px;'>" +
-      "<tr><td style='padding:6px 0;color:#5b6b66;width:52%;'>Overall completion</td><td style='padding:6px 0;'><b>" + a.pct + "%</b> — " + a.tasksDone + "/" + a.tasksTotal + " tasks done</td></tr>" +
-      "<tr><td style='padding:6px 0;color:#5b6b66;'>Active projects</td><td style='padding:6px 0;'>" + a.activeProjects + "</td></tr>" +
-      "<tr><td style='padding:6px 0;color:#5b6b66;'>Clients</td><td style='padding:6px 0;'>" + a.clientsTotal + "</td></tr>" +
-      "<tr><td style='padding:6px 0;color:#5b6b66;'>Overdue tasks</td><td style='padding:6px 0;'>" + a.overdue + "</td></tr>" +
-      "<tr><td style='padding:6px 0;color:#5b6b66;'>Last change of any kind</td><td style='padding:6px 0;'>" + (a.daysSinceWrite === null ? 'never' : a.daysSinceWrite === 0 ? 'today' : a.daysSinceWrite + ' day(s) ago') + "</td></tr>" +
-      "</table>" +
-    "</div>" +
-    "<div style='text-align:center;font-size:12px;color:#8a9995;padding:8px 0 0;'>Automated daily report &middot; generated by Task by Gershon.AI &middot; <a href='" + siteUrl() + "/dashboard' style='color:#1f6f5c;'>Open the dashboard</a></div>" +
-    "</div></div>"
-}
