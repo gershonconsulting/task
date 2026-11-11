@@ -67,6 +67,18 @@ CI            : .github/
   conflicted #10, built on main and carrying #8's one-score change).
 
 
+2026-11-11 wave 3 — Health live feeds: last 5 matrix columns (PR nightly/2026-11-11-health-live-feeds)
+----------------------------------------------------------------
+- ✅ supabase/sql/2026-11-11_health_live_feeds.sql: one idempotent block per column
+  (client, publish, socialtracking, events, icp) -> endpoint + source='live' + active=true,
+  pre/post-check SELECTs, ROLLBACK back to pending/inactive. Supersedes blocks 5-7 of the
+  2026-10-27 file and PR #11 (close #11 unmerged). Secret by name only (matrix_stats_secret).
+- ✅ docs/health-live-feeds.md: state per endpoint, merge/deploy order, 401/200 checks.
+- ❌ NOT applied: SQL not run, nothing deployed. Endpoints: publish + icp live; client #6 and
+  events-gershon-ai #3 open (merge clean, tests/build pass); socialtracking merged, deploy
+  not confirmed. Ariel merges/deploys, Charles runs the SQL blocks after each 401/200 check.
+
+
 2026-11-07 nightly — Task daily e-mail: overdue is red unless 0 (PR nightly/2026-11-07-task-daily-email)
 ----------------------------------------------------------------
 - ✅ Bug: the 2026-11-05 report ("No activity · Progress 1/6") showed "Overdue tasks
