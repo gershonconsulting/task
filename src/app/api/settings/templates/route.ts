@@ -46,7 +46,7 @@ function sanitizeCustom(input: unknown): ProcessTemplate[] {
       slug,
       label,
       icon: typeof t.icon === 'string' && t.icon ? t.icon : '📁',
-      color: typeof t.color === 'string' && t.color ? t.color : '#6366f1',
+      color: typeof t.color === 'string' && t.color ? t.color : '#FE1B04',
       description: typeof t.description === 'string' ? t.description : '',
       category: typeof t.category === 'string' && t.category ? t.category : 'Custom',
       projectType: t.projectType === 'simple' || t.projectType === 'complex' ? t.projectType : 'advanced',

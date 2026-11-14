@@ -27,7 +27,7 @@ export default function ClientPortal({ user, project, tasks, template }: Props) 
   const done = tasks.filter(t => t.status === 'completed').length
   const total = tasks.length
   const pct = total === 0 ? 0 : Math.round((done / total) * 100)
-  const accent = template?.color ?? '#6366f1'
+  const accent = template?.color ?? '#FE1B04'
 
   async function handlePwSave(e: React.FormEvent) {
     e.preventDefault()
