@@ -67,6 +67,16 @@ CI            : .github/
   conflicted #10, built on main and carrying #8's one-score change).
 
 
+2026-11-13 nightly — Task daily e-mail: "last change" now measured from the reported day (PR nightly/2026-11-13-task-daily-activity, v1.3.3)
+----------------------------------------------------------------
+- ✅ Read-only SQL (task project): tasks updated per ET day since 11-01 = 11-09: 15 (0 done), 11-12: 4 (4 done). updated_at triggers exist on tasks/projects, so
+  the data is written; there is NO wrong-column/status bug. "No activity" for empty days was correct; the contradiction was the "last change" line, measured from
+  TODAY, so a late run (GitHub cron drift) that saw 11-12 edits said "0 days ago" next to "nothing moved on 11-11". Now measured from the reported day, with newer changes flagged.
+- ✅ canonicalOwner(): "Olivier" shown as "Olivier Attia" in the stuck list (display only, data untouched). ❌ "Nicky" vs "Nicolette Jones" not resolvable by code: fix the data or add an alias table.
+- ✅ scripts/daily-activity-check.ts passes (npx tsx). tsc --strict on the two lib files passes. ❌ next build / next-on-pages / route typecheck NOT run (no node_modules offline).
+- ❌ Not proven: "No activity every day since 11-05" vs 15 tasks touched on 11-09 (that report should not have alarmed); check the 11-10 email. Send-time drift is GitHub cron lateness, not changed here.
+- ❌ Not deployed. v1.3.3 chosen because open PR #18 uses 1.3.2 (main is 1.3.1).
+
 2026-11-07 nightly — Task daily e-mail: overdue is red unless 0 (PR nightly/2026-11-07-task-daily-email)
 ----------------------------------------------------------------
 - ✅ Bug: the 2026-11-05 report ("No activity · Progress 1/6") showed "Overdue tasks

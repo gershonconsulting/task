@@ -58,3 +58,33 @@ export function summarize(opts: { score: number; max?: number; nothingHappened: 
     headerLine: alarm ? 'No activity yesterday · ' + scoreText : scoreText,
   }
 }
+
+// Last change of any kind, measured from the REPORTED day so it can never contradict the
+// activity section. A change made after the reported day (e.g. earlier today, when the job ran
+// late) is flagged separately instead of making "last change" read "0 days ago".
+export type LastChange = { lastYmd: string | null; daysBeforeReported: number | null; laterChanges: boolean; text: string }
+export function lastChange(stampYmds: string[], reportedYmd: string): LastChange {
+  const upTo = stampYmds.filter(s => s <= reportedYmd).sort()
+  const lastYmd = upTo.length ? upTo[upTo.length - 1] : null
+  const laterChanges = stampYmds.some(s => s > reportedYmd)
+  const days = lastYmd ? Math.round((Date.parse(reportedYmd + 'T12:00:00Z') - Date.parse(lastYmd + 'T12:00:00Z')) / 86400000) : null
+  const base = lastYmd === null ? 'never'
+    : days === 0 ? 'on the reported day'
+    : days + ' day(s) before the reported day (' + lastYmd + ')'
+  return { lastYmd, daysBeforeReported: days, laterChanges, text: base + (laterChanges ? '; newer changes exist since (they appear in the next report)' : '') }
+}
+
+// Group assignees canonically for display: a single-word name ("Olivier") that is the first word
+// of exactly one longer known name ("Olivier Attia") is shown as the longer name.
+// Nicknames that are not a prefix ("Nicky" vs "Nicolette Jones") cannot be resolved here.
+export function canonicalOwner(name: string | null, known: Iterable<string | null>): string | null {
+  if (!name) return name
+  const n = name.trim()
+  if (n.includes(' ')) return n
+  const longer = new Set<string>()
+  for (const k of known) {
+    const kk = (k ?? '').trim()
+    if (kk.includes(' ') && kk.split(/\s+/)[0].toLowerCase() === n.toLowerCase()) longer.add(kk)
+  }
+  return longer.size === 1 ? [...longer][0] : n
+}

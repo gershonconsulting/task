@@ -4,7 +4,7 @@ import { siteUrl } from '@/lib/site'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { supabaseAdmin } from '@/lib/supabaseServer'
-import { summarize, overdueCheck } from '@/lib/dailyReportSummary'
+import { summarize, overdueCheck, lastChange, canonicalOwner } from '@/lib/dailyReportSummary'
 import { buildEmail, esc, longDate, type Check, type DayCounts, type Snapshot, type StuckTask } from '@/lib/dailyReportEmail'
 
 // Daily "what happened yesterday" report for Task by Gershon.AI.
@@ -101,9 +101,7 @@ async function handle(req: NextRequest, preview: boolean) {
     ...allTasks.map(t => t.updated_at), ...allTasks.map(t => t.created_at),
     ...allProjects.map(p => p.updated_at), ...allProjects.map(p => p.created_at),
   ].filter(Boolean).map(s => Date.parse(s)).filter(n => !isNaN(n))
-  const lastWriteMs = stamps.length ? Math.max(...stamps) : 0
-  const lastWriteYmd = lastWriteMs ? tzDate(new Date(lastWriteMs)) : null
-  const daysSinceWrite = lastWriteYmd ? daysBetween(lastWriteYmd, todayYmd) : null
+  const lc = lastChange(stamps.map(ms => tzDate(new Date(ms))), yYmd)
 
   // Progress score, 6 measures, 1 point each.
   // `why` explains a ✗ in plain words; `href` is where to act on it in the app.
@@ -128,7 +126,7 @@ async function handle(req: NextRequest, preview: boolean) {
     .slice(0, 6)
     .map(t => ({
       name: t.name,
-      owner: t.assigned_to,
+      owner: canonicalOwner(t.assigned_to, allTasks.map(x => x.assigned_to)),
       due: t.due_date!,
       daysLate: daysBetween(t.due_date!.slice(0, 10), todayYmd),
       project: t.project_id ? projectName.get(t.project_id) ?? null : null,
@@ -144,9 +142,9 @@ async function handle(req: NextRequest, preview: boolean) {
 
   const warnings: string[] = []
   if (missedRuns > 0) warnings.push('The daily report did not run for ' + missedRuns + ' day(s) — last run was ' + esc(prev!.date) + '. The scheduled job is failing or disabled.')
-  if (summary.alarm) warnings.push('Nothing moved on ' + longDate(yYmd) + ': no project, task or client was created, updated or completed.' + (daysSinceWrite !== null ? ' The last change of any kind was ' + daysSinceWrite + ' day(s) ago.' : ''))
+  if (summary.alarm) warnings.push('Nothing moved on ' + longDate(yYmd) + ': no project, task or client was created, updated or completed.' + ' Last change of any kind: ' + lc.text + '.')
 
-  const html = buildEmail({ base, yYmd, y, checks, summary, pct, tasksDone, tasksTotal, overdue, overdueTrend: od.trend, activeProjects, clientsTotal: allClients.length, warnings, daysSinceWrite, stuck })
+  const html = buildEmail({ base, yYmd, y, checks, summary, pct, tasksDone, tasksTotal, overdue, overdueTrend: od.trend, activeProjects, clientsTotal: allClients.length, warnings, lastChangeText: lc.text, stuck })
   const subject =
     (warnings.length ? '⚠ ' : '') +
     'Task — Daily report, ' + longDate(yYmd).replace(/^\w+, /, '') + ' — ' +
