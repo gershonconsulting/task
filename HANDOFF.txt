@@ -67,6 +67,12 @@ CI            : .github/
   conflicted #10, built on main and carrying #8's one-score change).
 
 
+2026-11-15 nightly — Task daily e-mail wording (PR nightly/2026-11-15-task-daily-wording, v1.3.5)
+----------------------------------------------------------------
+- ✅ "Quiet weekend day" on Fri 13 Nov: isQuietDay() also looked at the SEND day (Saturday). Now only the reported America/New_York day counts (reportDays()), so an empty Friday raises the warning again;
+  "Work moved" banner only when something was created/touched (else "No task changes yesterday"); "No activity · Progress 1/6" is now "No task changes yesterday · 1/6 measures met".
+- ✅ scripts/daily-wording-check.ts + daily-activity-check.ts pass (npx tsx); tsc --strict on the two lib files passes. ❌ next build / next-on-pages NOT run (no node_modules offline). ❌ Not deployed.
+
 2026-11-13 nightly — Task daily e-mail: "last change" now measured from the reported day (PR nightly/2026-11-13-task-daily-activity, v1.3.3)
 ----------------------------------------------------------------
 - ✅ Read-only SQL (task project): tasks updated per ET day since 11-01 = 11-09: 15 (0 done), 11-12: 4 (4 done). updated_at triggers exist on tasks/projects, so

@@ -4,7 +4,7 @@ import { siteUrl } from '@/lib/site'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { supabaseAdmin } from '@/lib/supabaseServer'
-import { summarize, overdueCheck, lastChange, canonicalOwner } from '@/lib/dailyReportSummary'
+import { summarize, overdueCheck, lastChange, canonicalOwner, nyYmd, reportDays } from '@/lib/dailyReportSummary'
 import { buildEmail, esc, longDate, type Check, type DayCounts, type Snapshot, type StuckTask } from '@/lib/dailyReportEmail'
 
 // Daily "what happened yesterday" report for Task by Gershon.AI.
@@ -16,7 +16,6 @@ import { buildEmail, esc, longDate, type Check, type DayCounts, type Snapshot, t
 //   2. Did we make progress? (scored 0-6 against the previous run's snapshot)
 //   3. Did the system fail to do its daily job? (big red warning)
 
-const TZ = 'America/New_York'
 const STATE_KEY = 'daily_report_state'
 
 const PRIMARY_FROM = 'GC Task <reports@gershon.ai>'
@@ -33,16 +32,8 @@ function readEnv(name: string): string | undefined {
   try { return (getRequestContext().env as Record<string, string>)[name] } catch { return process.env[name] }
 }
 
-// YYYY-MM-DD for an instant, in the report timezone.
-function tzDate(d: Date): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
-}
-
-function addDays(ymd: string, n: number): string {
-  const d = new Date(ymd + 'T12:00:00Z')
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().slice(0, 10)
-}
+// YYYY-MM-DD for an instant, in the report timezone (America/New_York).
+const tzDate = nyYmd
 
 function onDay(ts: string | null | undefined, ymd: string): boolean {
   if (!ts) return false
@@ -73,9 +64,8 @@ async function handle(req: NextRequest, preview: boolean) {
   const allClients = (clients ?? []) as Client[]
 
   const now = new Date()
-  const todayYmd = tzDate(now)
-  const yYmd = addDays(todayYmd, -1)
-  const dYmd = addDays(todayYmd, -2)
+  // All three are America/New_York dates; yYmd is the report period (weekend wording keys off it).
+  const { todayYmd, reportedYmd: yYmd, prevYmd: dYmd } = reportDays(now)
 
   let prev: Snapshot | null = null
   try { prev = state?.value ? (JSON.parse(state.value as string) as Snapshot) : null } catch { prev = null }
