@@ -11,19 +11,45 @@ export function isWeekend(ymd: string): boolean {
   return w === 0 || w === 6
 }
 
-// A "quiet day": the report is sent on a Saturday/Sunday (America/New_York), or it covers one.
-// No activity is expected then, so "nothing happened" must not raise the alarm.
-export function isQuietDay(todayYmd: string, reportedYmd: string): boolean {
-  return isWeekend(todayYmd) || isWeekend(reportedYmd)
+export const REPORT_TZ = 'America/New_York'
+
+// YYYY-MM-DD of an instant in America/New_York (never the UTC date: 9pm ET Friday is
+// already Saturday in UTC).
+export function nyYmd(d: Date): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: REPORT_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
+}
+
+export function addDaysYmd(ymd: string, n: number): string {
+  const d = new Date(ymd + 'T12:00:00Z')
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+// The days a run at `now` talks about, all as America/New_York calendar dates:
+// today (send day), reported (= yesterday, the report period) and the day before (comparison).
+export function reportDays(now: Date): { todayYmd: string; reportedYmd: string; prevYmd: string } {
+  const todayYmd = nyYmd(now)
+  return { todayYmd, reportedYmd: addDaysYmd(todayYmd, -1), prevYmd: addDaysYmd(todayYmd, -2) }
+}
+
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+// A "quiet day": the REPORTED day (America/New_York) is a Saturday or Sunday. Only then is
+// "no activity" expected. The send day does not matter: Saturday's e-mail reports on Friday,
+// a working day (this used to call Friday 13 Nov 2026 a "quiet weekend day").
+export function isQuietDay(reportedYmd: string): boolean {
+  return isWeekend(reportedYmd)
 }
 
 export type ReportSummary = {
   score: number          // 0-6, computed once from the checks
   max: number
   alarm: boolean         // nothing happened on a working day
+  nothingHappened: boolean
   quietNote: string | null
   subjectTail: string    // appended after the date in the subject
   headerLine: string     // shown in the email header card
+  bannerTitle: string    // first line of the banner under the header; follows the real counts
 }
 
 // The "Overdue tasks" measure. Any overdue task is a ✗ (red): "43 → 43" is not progress.
@@ -42,20 +68,29 @@ export function overdueCheck(overdue: number, prevOverdue: number | null): { ok:
   return { ok, why, trend }
 }
 
-export function summarize(opts: { score: number; max?: number; nothingHappened: boolean; todayYmd: string; reportedYmd: string; overdue?: number }): ReportSummary {
+// `todayYmd` is kept for callers but no longer decides anything: only the reported day does.
+export function summarize(opts: { score: number; max?: number; nothingHappened: boolean; todayYmd?: string; reportedYmd: string; overdue?: number }): ReportSummary {
   const max = opts.max ?? 6
-  const quiet = isQuietDay(opts.todayYmd, opts.reportedYmd)
+  const quiet = isQuietDay(opts.reportedYmd)
   const alarm = opts.nothingHappened && !quiet
   const overdue = opts.overdue ?? 0
-  // The overdue count is part of the headline so it can never read better than the tiles below it.
-  const scoreText = 'Progress ' + opts.score + '/' + max + (overdue > 0 ? ' · ' + overdue + ' overdue' : '')
+  // The score counts measures met (of 6), it is not an activity count: label it as such so
+  // "No task changes" next to it does not read as a contradiction. The overdue count is part of
+  // the headline so it can never read better than the tiles below it.
+  const scoreText = opts.score + '/' + max + ' measures met' + (overdue > 0 ? ' · ' + overdue + ' overdue' : '')
+  const overdueTail = overdue > 0 ? ', ' + overdue + ' task(s) still overdue' : ''
   return {
     score: opts.score,
     max,
     alarm,
-    quietNote: opts.nothingHappened && quiet ? 'Quiet weekend day: no activity was expected, so this is not flagged.' : null,
-    subjectTail: alarm ? 'No activity · ' + scoreText : scoreText,
-    headerLine: alarm ? 'No activity yesterday · ' + scoreText : scoreText,
+    nothingHappened: opts.nothingHappened,
+    quietNote: opts.nothingHappened && quiet ? 'Quiet weekend day (' + WEEKDAYS[weekdayOf(opts.reportedYmd)] + '): no activity was expected, so this is not flagged.' : null,
+    subjectTail: opts.nothingHappened ? 'No task changes · ' + scoreText : scoreText,
+    headerLine: opts.nothingHappened ? 'No task changes yesterday · ' + scoreText : scoreText,
+    // "Work moved" only when something was actually created/touched on the reported day.
+    bannerTitle: opts.nothingHappened ? 'No task changes yesterday' + overdueTail
+      : overdue > 0 ? 'Work moved, but ' + overdue + ' task(s) are still overdue'
+      : 'The system did its job',
   }
 }
 

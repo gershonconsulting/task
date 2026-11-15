@@ -63,18 +63,24 @@ export function buildEmail(a: {
 
   // Banner: red when the system failed; green "did its job" only when nothing is overdue either,
   // so the top of the e-mail never reads better than the overdue tile below it.
-  const doneLine = a.y.tasksCompleted + " task(s) completed, " + a.y.tasksCreated + " created, " + a.y.projectsCreated + " new project(s) on " + longDate(a.yYmd) + "."
+  // The banner title comes from summary.bannerTitle, so "Work moved" can only appear when
+  // something was created or touched on the reported day.
+  const doneLine = a.y.tasksTouched + " task(s) touched, " + a.y.tasksCompleted + " completed, " + a.y.tasksCreated + " created, " + a.y.projectsCreated + " new project(s) on " + longDate(a.yYmd) + "."
   const warnHtml = a.warnings.length
     ? "<div style='background:#fdecea;border-left:5px solid " + RED + ";border-radius:6px;padding:18px 24px;margin-bottom:16px;'>" +
       "<div style='font-size:17px;font-weight:700;color:#8e2318;margin-bottom:6px;'>&#9888; BIG WARNING — the system did not do its daily job</div>" +
       "<div style='font-size:14px;color:#5a1c14;line-height:1.55;'>" + a.warnings.map(w => '&bull; ' + w).join('<br>') + "</div></div>"
     : a.overdue > 0
       ? "<div style='background:#ffffff;border-left:5px solid " + RED + ";border-radius:6px;padding:18px 24px;margin-bottom:16px;'>" +
-        "<div style='font-size:17px;font-weight:700;color:#8e2318;margin-bottom:6px;'>Work moved, but " + a.overdue + " task(s) are still overdue</div>" +
+        "<div style='font-size:17px;font-weight:700;color:#8e2318;margin-bottom:6px;'>" + esc(a.summary.bannerTitle) + "</div>" +
         "<div style='font-size:14px;color:#1d4a3d;line-height:1.55;'>" + doneLine + "</div></div>"
-      : "<div style='background:#eaf6f1;border-left:5px solid #1f6f5c;border-radius:6px;padding:18px 24px;margin-bottom:16px;'>" +
-        "<div style='font-size:17px;font-weight:700;color:#14503f;margin-bottom:6px;'>&#10003; The system did its job</div>" +
-        "<div style='font-size:14px;color:#1d4a3d;line-height:1.55;'>" + doneLine + "</div></div>"
+      : a.summary.nothingHappened
+        ? "<div style='background:#ffffff;border-left:5px solid #8a9995;border-radius:6px;padding:18px 24px;margin-bottom:16px;'>" +
+          "<div style='font-size:17px;font-weight:700;color:#12352c;margin-bottom:6px;'>" + esc(a.summary.bannerTitle) + "</div>" +
+          "<div style='font-size:14px;color:#1d4a3d;line-height:1.55;'>" + doneLine + "</div></div>"
+        : "<div style='background:#eaf6f1;border-left:5px solid #1f6f5c;border-radius:6px;padding:18px 24px;margin-bottom:16px;'>" +
+          "<div style='font-size:17px;font-weight:700;color:#14503f;margin-bottom:6px;'>&#10003; " + esc(a.summary.bannerTitle) + "</div>" +
+          "<div style='font-size:14px;color:#1d4a3d;line-height:1.55;'>" + doneLine + "</div></div>"
 
   // Any overdue task is red, whatever the trend.
   const overdueHtml = a.overdue > 0
@@ -93,7 +99,7 @@ export function buildEmail(a: {
     warnHtml +
     (a.summary.quietNote ? "<div style='background:#f0f4f3;border-radius:6px;padding:12px 24px;margin-bottom:16px;font-size:14px;color:#5b6b66;'>" + esc(a.summary.quietNote) + "</div>" : '') +
     "<div style='background:#ffffff;border-radius:6px;padding:20px 24px;margin-bottom:16px;'>" +
-      "<div style='font-size:16px;font-weight:700;color:#12352c;margin-bottom:12px;'>Progress score: " + a.summary.score + " / " + a.summary.max + "</div>" +
+      "<div style='font-size:16px;font-weight:700;color:#12352c;margin-bottom:12px;'>Progress score: " + a.summary.score + " / " + a.summary.max + " measures met</div>" +
       "<table style='width:100%;border-collapse:collapse;font-size:14px;'>" +
       "<tr style='background:#f0f4f3;'><th align='left' style='padding:8px 10px;color:#12352c;'>Measure</th>" +
       "<th align='center' style='padding:8px 10px;color:#12352c;'>Yesterday</th>" +
