@@ -13,7 +13,7 @@ relay send). Body: `{secret, format:"json"}` -> data; `{secret, html, subject, t
 - auth: the app stores only `sha256(secret)` = `7031a38b…77569`; plain value is
   `cc_health_config.matrix_stats_secret`. Wrong secret -> `401 {"ok":false}`.
 - reply `{"ok":true,"platform":"…","as_of":"ISO","results":[{"key","ok","note"}]}` (Social adds `others`).
-- Client / Publish / Social Tracking also accept the secret as `Authorization: Bearer <secret>` (curl tests).
+- Client / Publish / Social Tracking / Events / ICP also accept the secret as `Authorization: Bearer <secret>` (curl tests).
 - A column is live when `client_platform_columns.endpoint` is set. No redeploy needed.
 
 | Column | Feed | State 2026-10-27 |
@@ -23,10 +23,14 @@ relay send). Body: `{secret, format:"json"}` -> data; `{secret, html, subject, t
 | Social | social.gershon.ai/api/matrix-stats | endpoint deployed; set `endpoint` (sql/2026-10-27_matrix_live_endpoints.sql) |
 | NexaShare | nexashare.com/api/matrix-stats (D1 nexashare-db) | nexashare PR, then SQL |
 | Pulse | pulse.gershoncrm.com/api/matrix-stats (KV PULSE_KV) | pulse PR, then SQL |
-| Client | client.gershoncrm.com/api/matrix-stats (KV COMPANIES_KV, client numbers) | client PR, then SQL block 5 (sets active) |
-| Publish | publish.gershon.ai/api/matrix-stats (Neon, ScheduledPost) | publish PR, then SQL block 6 |
-| Social Tracking | socialtracking.gershon.ai/api/matrix-stats (Neon, attainment) | socialtracking PR, then SQL block 7 |
-| Events, ICP | none yet | inactive |
+| Client | client.gershoncrm.com/api/matrix-stats (KV COMPANIES_KV, client numbers) | client PR #6, then sql/2026-11-11_health_live_feeds.sql block 1 |
+| Publish | publish.gershon.ai/api/matrix-stats (Neon, ScheduledPost) | on main + live (v0.18.0); block 2 |
+| Social Tracking | socialtracking.gershon.ai/api/matrix-stats (Neon, attainment) | on main (PR #2); deploy, then block 3 |
+| Events | events.gershon.ai/api/matrix-stats (KV STORE, clients + graded events) | events-gershon-ai PR #3, then block 4 |
+| ICP | icp.gershon.ai/api/matrix-stats (KV STORE, saved 12-point reports) | on main + live (v1.8.0); block 5 |
+
+**2026-11-11:** the 5 remaining columns are switched on by `supabase/sql/2026-11-11_health_live_feeds.sql`
+(supersedes blocks 5-7 of the 2026-10-27 file and PR #11). Order and checks: `docs/health-live-feeds.md`.
 
 ## Test
 `POST /functions/v1/client-platform-matrix` with `{"secret":"<CRON_SECRET>","dry":true}` returns the HTML
