@@ -32,7 +32,7 @@ export const TEMPLATES: ProcessTemplate[] = [
 
 // SETUP & LIFECYCLE
 {
-  slug: 'client-onboarding', label: 'Client Onboarding', icon: '🎯', color: '#CC3333',
+  slug: 'client-onboarding', label: 'Client Onboarding', icon: '🎯', color: '#FE1B04',
   description: 'Setup checklist for a new client engagement.', category: 'Setup & Lifecycle', projectType: 'complex',
   tasks: [
     { id: 'co-xero', name: 'Create user in Xero', assignedTo: 'Aina Rama', priority: 'medium', dueOffsetDays: 1, tool: 'xero' },

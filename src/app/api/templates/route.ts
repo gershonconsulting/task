@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   const label = (body.label as string ?? '').trim()
   const slug = (body.slug as string ?? '').trim()
   const icon = (body.icon as string ?? '📋').trim()
-  const color = (body.color as string ?? '#6366f1').trim()
+  const color = (body.color as string ?? '#FE1B04').trim()
   const description = (body.description as string ?? '').trim()
   const tasks = body.tasks ?? []
 
@@ -80,4 +80,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 })
   }
 }
-

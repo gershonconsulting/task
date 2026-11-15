@@ -197,7 +197,7 @@ Deno.serve(async (req) => {
     let rowsHtml = "", last = "";
     for (const r of clients) {
       if (r.company !== last) {
-        rowsHtml += `<tr><td colspan="${cols.length + 1}" style="padding:8px 6px;background:#fdf2f2;font-weight:800;color:#a8281f">${esc(r.company)} <span style="font-weight:400;font-size:11px;color:#5d6b80">${esc(r.flexi_id || "")}</span></td></tr>`;
+        rowsHtml += `<tr><td colspan="${cols.length + 1}" style="padding:8px 6px;background:#fff5f5;font-weight:800;color:#d11200">${esc(r.company)} <span style="font-weight:400;font-size:11px;color:#5d6b80">${esc(r.flexi_id || "")}</span></td></tr>`;
         last = r.company;
       }
       rowsHtml += `<tr><td style="padding:8px 6px;border-bottom:1px solid #dfe5ee"><div style="font-weight:600">${esc(r.person)}</div><div style="font-size:10px;color:#5d6b80">${esc((r.emails || []).join(" · "))}</div></td>${r.cellsOut.map(mark).join("")}</tr>`;
@@ -208,7 +208,7 @@ Deno.serve(async (req) => {
 <div style="max-width:900px;margin:0 auto;padding:20px 10px">
 <div style="background:#fff;border:1px solid #dfe5ee;border-radius:12px;padding:18px;overflow-x:auto">
 <div style="font-size:22px;font-weight:800;color:#152033">Client Platform Matrix · ${esc(period)}</div>
-<p style="color:#5d6b80;margin:6px 0 14px;font-size:13px">${companies.length} clients, ${clients.length} people across ${cols.length} platforms.${full.length ? ` <b style="color:#152033">${full.map(esc).join(" and ")}</b> ${full.length > 1 ? "are" : "is"} on all of them.` : ""} <a href="${BOARD_URL}" style="color:#CC3333">Open the live board</a></p>
+<p style="color:#5d6b80;margin:6px 0 14px;font-size:13px">${companies.length} clients, ${clients.length} people across ${cols.length} platforms.${full.length ? ` <b style="color:#152033">${full.map(esc).join(" and ")}</b> ${full.length > 1 ? "are" : "is"} on all of them.` : ""} <a href="${BOARD_URL}" style="color:#FE1B04">Open the live board</a></p>
 <table style="border-collapse:collapse;width:100%;font-size:13px;color:#152033">${head}${rowsHtml}</table>
 ${socialOnly.length ? `<div style="font-weight:800;margin:20px 0 6px">Other companies tracked in Social</div>${chips(socialOnly)}` : ""}
 <p style="color:#8a96a8;font-size:11px;margin:18px 0 0;line-height:1.5">Live at send time: ${esc(live.join(", ") || "none")}${radarErr ? " (Radar failed: " + esc(radarErr) + ")" : ""}. Last recorded: ${esc(manual.join("; ") || "none")}${pending.length ? ". Not connected yet (shown as &ndash;): " + esc(pending.join(", ")) : ""}. Fallback copy sent by the task database.</p>
