@@ -67,6 +67,17 @@ CI            : .github/
   conflicted #10, built on main and carrying #8's one-score change).
 
 
+2026-11-16 nightly — Resend retry with one Idempotency-Key per e-mail (PR nightly/2026-11-16-task-resend-retry, v1.3.6)
+----------------------------------------------------------------
+- Why: 2026-11-13 18:20-21:54 UTC Resend failed and the Task daily e-mail was never retried.
+- ✅ src/lib/resendSend.ts: one sender for daily report, Friday/master reports and invites. Retries network error/timeout, 429, 5xx
+  (and 409 concurrent_idempotent_requests) up to 3 times after 1s / 4s / 10s; the SAME Idempotency-Key on every attempt, so no double send;
+  other 4xx not retried; final failure logged as "[resend] <label>: FINAL FAILURE ... idempotency <key>". No sender/recipient/secret change.
+- ✅ scripts/resend-retry-check.ts 5/5 (429->200 = one send, same key; 400 = no retry; network+503; 4x500 final failure; distinct keys).
+- ✅ tsc --noEmit clean; next build + @cloudflare/next-on-pages pass; daily-wording-check + daily-activity-check pass.
+- ❌ supabase/functions/client-platform-matrix still sends without retry (Deno function, would need a function redeploy) - not changed.
+- ❌ Not deployed (merge to main auto-builds on Cloudflare Pages).
+
 2026-11-15 nightly — Task daily e-mail wording (PR nightly/2026-11-15-task-daily-wording, v1.3.5)
 ----------------------------------------------------------------
 - ✅ "Quiet weekend day" on Fri 13 Nov: isQuietDay() also looked at the SEND day (Saturday). Now only the reported America/New_York day counts (reportDays()), so an empty Friday raises the warning again;
