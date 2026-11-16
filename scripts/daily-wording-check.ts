@@ -45,8 +45,10 @@ assert.equal(isQuietDay(reportDays(new Date('2026-11-16T11:00:00Z')).reportedYmd
 for (const r of [fri, satRep]) {
   assert.ok(!r.html.includes('Work moved'), '"Work moved" with 0 touched')
   assert.ok(!r.html.includes('No activity'), '"No activity" next to a score')
-  assert.ok(r.summary.headerLine.startsWith('No task changes yesterday · 1/6 measures met'))
 }
+assert.ok(fri.summary.headerLine.startsWith('No task changes yesterday · 1/6 measures met'))
+// v1.3.7: a weekend reported day is not scored (see scripts/daily-weekend-check.ts).
+assert.ok(satRep.summary.headerLine.startsWith('No task changes yesterday · Weekend — not scored'))
 assert.ok(satRep.html.includes('No task changes yesterday, 50 task(s) still overdue'))
 assert.ok(satRep.html.includes('0 task(s) touched'))
 
