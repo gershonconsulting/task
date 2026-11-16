@@ -1,5 +1,5 @@
 # task (task.gershon.ai) STATUS
-Updated 2026-11-16. Version in main: 1.3.5 (package.json); 1.3.6 on branch nightly/2026-11-16-task-resend-retry (PR #22); 1.3.7 on nightly/2026-11-16-task-daily-weekend (stacked on #22).
+Updated 2026-11-16. Version in main: 1.3.7 (package.json): PR #22 (1.3.6 Resend retry) and PR #23 (1.3.7 daily report weekends) merged 2026-11-16, deployed by the Cloudflare Pages workflow.
 
 ## Done
 - v1.3.7 daily report (PR open, stacked on #22): weekend reported day (ET Sat/Sun) = "Weekend — not scored", all marks neutral, no red; unchanged Completion % = – not ✗ ("x/6 measures met · n unchanged"); subject/header/body share summary.scoreLine; scripts/daily-weekend-check.ts
