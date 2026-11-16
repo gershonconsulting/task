@@ -2,6 +2,7 @@ export const runtime = 'edge'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseServer'
+import { sendResendEmail } from '@/lib/resendSend'
 import { readEnv, siteUrl } from '@/lib/site'
 import { loadTeam, OWNER_EMAILS, type TeamMember } from '@/lib/team'
 import { etToday, loadMyWork, type MyWork, type WorkTask } from '@/lib/myWork'
@@ -85,13 +86,9 @@ function buildEmail(m: TeamMember, w: MyWork): { subject: string; html: string }
 }
 
 async function sendOne(key: string, to: string, subject: string, html: string) {
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: FROM, to: [to], subject, html }),
-  })
-  const body = await res.json().catch(() => ({})) as { id?: string; message?: string }
-  return { ok: res.ok, id: body.id, error: res.ok ? undefined : (body.message ?? res.status) }
+  // Retries 429/5xx/network with one Idempotency-Key per logical send (src/lib/resendSend.ts).
+  const r = await sendResendEmail(key, { from: FROM, to: [to], subject, html }, { label: 'task-weekly' })
+  return { ok: r.ok, id: r.body.id, error: r.ok ? undefined : (r.body.message ?? r.status), attempts: r.attempts }
 }
 
 export async function GET(req: NextRequest) {
