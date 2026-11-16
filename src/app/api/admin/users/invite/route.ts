@@ -5,6 +5,7 @@ import { requireOwnerApi } from '@/lib/adminAuth'
 import { loadTeam, saveTeam } from '@/lib/team'
 import { readEnv, siteUrl } from '@/lib/site'
 import { newToken, toAdminUser } from '@/lib/adminUsers'
+import { sendResendEmail } from '@/lib/resendSend'
 
 /**
  * POST {id, send?: boolean, regenerate?: boolean}
@@ -46,12 +47,8 @@ export async function POST(req: NextRequest) {
     <p style="margin:18px 0 0;font-size:12px;color:#6e6e73;">This link is personal and works once. If the button does not work, open: ${esc(url)}</p>
   </div>
 </div></body></html>`
-    const r = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: FROM, to: [m.email], reply_to: 'olivier@gershonconsulting.com', subject: 'Your access to Task by Gershon.AI', html }),
-    })
-    if (!r.ok) return NextResponse.json({ error: 'E-mail failed: ' + (await r.text()).slice(0, 200), user: toAdminUser(m) }, { status: 502 })
+    const r = await sendResendEmail(key, { from: FROM, to: [m.email], reply_to: 'olivier@gershonconsulting.com', subject: 'Your access to Task by Gershon.AI', html }, { label: 'task-invite' })
+    if (!r.ok) return NextResponse.json({ error: 'E-mail failed: ' + JSON.stringify(r.body).slice(0, 200), user: toAdminUser(m) }, { status: 502 })
     sent = true
   }
   return NextResponse.json({ ok: true, sent, inviteUrl: url, user: toAdminUser(m) })

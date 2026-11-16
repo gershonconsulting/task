@@ -4,6 +4,7 @@ import { siteUrl } from '@/lib/site'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { supabaseAdmin } from '@/lib/supabaseServer'
+import { sendResendEmail } from '@/lib/resendSend'
 import { summarize, overdueCheck, lastChange, canonicalOwner, nyYmd, reportDays } from '@/lib/dailyReportSummary'
 import { buildEmail, esc, longDate, type Check, type DayCounts, type Snapshot, type StuckTask } from '@/lib/dailyReportEmail'
 
@@ -150,13 +151,9 @@ async function handle(req: NextRequest, preview: boolean) {
   if (!resendKey) return NextResponse.json({ error: 'RESEND_API_KEY not configured' }, { status: 500 })
 
   const send = async (from: string, to: string[]) => {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + resendKey, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to, subject, html }),
-    })
-    const body = await res.json().catch(() => ({}))
-    return { ok: res.ok, body }
+    // Retries 429/5xx/network with one Idempotency-Key per logical send (src/lib/resendSend.ts).
+    const r = await sendResendEmail(resendKey, { from, to, subject, html }, { label: 'task-daily' })
+    return { ok: r.ok, body: r.body, attempts: r.attempts }
   }
 
   let delivery = await send(PRIMARY_FROM, PRIMARY_TO)
