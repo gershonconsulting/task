@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { supabaseAdmin } from '@/lib/supabaseServer'
 import { sendResendEmail } from '@/lib/resendSend'
-import { summarize, overdueCheck, lastChange, canonicalOwner, nyYmd, reportDays } from '@/lib/dailyReportSummary'
+import { summarize, markOf, isQuietDay, overdueCheck, lastChange, canonicalOwner, nyYmd, reportDays } from '@/lib/dailyReportSummary'
 import { buildEmail, esc, longDate, type Check, type DayCounts, type Snapshot, type StuckTask } from '@/lib/dailyReportEmail'
 
 // Daily "what happened yesterday" report for Task by Gershon.AI.
@@ -103,11 +103,15 @@ async function handle(req: NextRequest, preview: boolean) {
     { label: 'Tasks created', v: y.tasksCreated, p: d.tasksCreated, ok: y.tasksCreated > 0, why: 'No task was added to any project.', href: base + '/tasks' },
     { label: 'Tasks completed', v: y.tasksCompleted, p: d.tasksCompleted, ok: y.tasksCompleted > 0, why: 'No task was marked done (' + (tasksTotal - tasksDone) + ' still open).', href: base + '/tasks' },
     { label: 'Tasks touched', v: y.tasksTouched, p: d.tasksTouched, ok: y.tasksTouched > 0, why: 'No task was edited, re-dated or re-assigned.', href: base + '/tasks' },
-    { label: 'Completion %', v: pct, p: prev ? prev.pct : pct, ok: prev ? pct > prev.pct : false, why: 'Overall completion stayed at ' + pct + '% (' + tasksDone + '/' + tasksTotal + ').', href: base + '/dashboard' },
+    { label: 'Completion %', v: pct, p: prev ? prev.pct : pct, ok: prev ? pct > prev.pct : false, why: prev && pct < prev.pct ? 'Overall completion went down to ' + pct + '% (from ' + prev.pct + '%).' : 'Overall completion stayed at ' + pct + '% (' + tasksDone + '/' + tasksTotal + ').', href: base + '/dashboard', unchangedIsNeutral: true },
     // ✓ only at 0 overdue: a flat or slightly lower non-zero count is still a red ✗.
     { label: 'Overdue tasks', v: overdue, p: prev ? prev.overdue : overdue, ok: od.ok, why: od.why, href: base + '/tasks' },
   ]
-  const score = checks.filter(c => c.ok).length
+  // Weekend (reported ET day Sat/Sun): not scored, every mark neutral. Unchanged level value: – not ✗.
+  const weekend = isQuietDay(yYmd)
+  for (const c of checks) c.mark = markOf(c, weekend)
+  const score = checks.filter(c => c.mark === 'ok').length
+  const unchanged = weekend ? 0 : checks.filter(c => c.mark === 'neutral').length
 
   // The open tasks that are most overdue: the concrete items to move next, each linked to its project.
   const projectName = new Map(allProjects.map(p => [p.id, p.company_name]))
@@ -129,7 +133,7 @@ async function handle(req: NextRequest, preview: boolean) {
   const missedRuns = prev ? Math.max(0, daysBetween(prev.date, todayYmd) - 1) : 0
 
   // One summary object drives the subject, the header and the body so they can never disagree.
-  const summary = summarize({ score, nothingHappened, todayYmd, reportedYmd: yYmd, overdue })
+  const summary = summarize({ score, nothingHappened, todayYmd, reportedYmd: yYmd, overdue, unchanged })
 
   const warnings: string[] = []
   if (missedRuns > 0) warnings.push('The daily report did not run for ' + missedRuns + ' day(s) — last run was ' + esc(prev!.date) + '. The scheduled job is failing or disabled.')
@@ -172,7 +176,8 @@ async function handle(req: NextRequest, preview: boolean) {
   return NextResponse.json({
     ok: delivery.ok,
     date: yYmd,
-    score,
+    score: summary.scored ? score : null,
+    scored: summary.scored,
     warnings,
     sentFrom: usedFallback ? FALLBACK_FROM : PRIMARY_FROM,
     sentTo: usedFallback ? FALLBACK_TO : PRIMARY_TO,
