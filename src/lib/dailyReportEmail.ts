@@ -1,10 +1,13 @@
 // HTML for the daily "what happened yesterday" e-mail (GC Task). Pure: no Next / Cloudflare
 // imports, so it can be rendered with sample data outside the app (the route passes `base`).
-import type { ReportSummary } from './dailyReportSummary'
+import type { ReportSummary, Mark } from './dailyReportSummary'
 
 export type Snapshot = { date: string; run_at: string; tasks_total: number; tasks_done: number; projects_total: number; overdue: number; pct: number }
 export type DayCounts = { projectsCreated: number; tasksCreated: number; tasksTouched: number; tasksCompleted: number; clientsAdded: number }
-export type Check = { label: string; v: number; p: number; ok: boolean; why: string; href: string }
+// `mark` (from markOf) decides ✓ / ✗ / –; without it, `ok` decides ✓ / ✗ as before.
+export type Check = { label: string; v: number; p: number; ok: boolean; why: string; href: string; unchangedIsNeutral?: boolean; mark?: Mark }
+const markOfCheck = (c: Check): Mark => c.mark ?? (c.ok ? 'ok' : 'fail')
+const GREY = '#8a9995'
 export type StuckTask = { name: string; owner: string | null; due: string; daysLate: number; project: string | null; href: string }
 
 const RED = '#c0392b'
@@ -29,7 +32,9 @@ export function buildEmail(a: {
 }): string {
   const link = 'color:#1f6f5c;text-decoration:underline;'
   // Which of the 6 measures did not move, why, and where to fix it.
-  const failed = a.checks.filter(c => !c.ok)
+  // Weekend days are not scored: nothing in the measures section (or the banner) is red.
+  const weekend = !a.summary.scored
+  const failed = weekend ? [] : a.checks.filter(c => markOfCheck(c) === 'fail')
   const failedHtml = failed.length
     ? "<div style='background:#ffffff;border-left:5px solid " + RED + ";border-radius:6px;padding:20px 24px;margin-bottom:16px;'>" +
       "<div style='font-size:16px;font-weight:700;color:#12352c;margin-bottom:10px;'>What did not move (" + failed.length + " of " + a.checks.length + ")</div>" +
@@ -49,16 +54,20 @@ export function buildEmail(a: {
         "<tr><td style='padding:8px 10px;border-bottom:1px solid #e6ebe9;'><a href='" + esc(s.href) + "' style='" + link + "'>" + esc(s.name) + "</a>" +
         (s.project ? "<div style='font-size:12px;color:#8a9995;'>" + esc(s.project) + "</div>" : '') + "</td>" +
         "<td style='padding:8px 10px;border-bottom:1px solid #e6ebe9;'>" + esc(s.owner || 'Unassigned') + "</td>" +
-        "<td align='right' style='padding:8px 10px;border-bottom:1px solid #e6ebe9;color:" + RED + ";white-space:nowrap;'>" + s.daysLate + " d</td></tr>").join('') +
+        "<td align='right' style='padding:8px 10px;border-bottom:1px solid #e6ebe9;color:" + (weekend ? GREY : RED) + ";white-space:nowrap;'>" + s.daysLate + " d</td></tr>").join('') +
       "</table></div>"
     : ''
   const card = 'background:#ffffff;border-left:5px solid #1f6f5c;border-radius:6px;padding:20px 24px;margin-bottom:16px;'
+  const markCell = (m: Mark) =>
+    m === 'ok' ? "<span style='color:#1f6f5c;'>&#10003;</span>"
+    : m === 'fail' ? "<span style='color:" + RED + ";'>&#10007;</span>"
+    : "<span style='color:" + GREY + ";'>&ndash;</span>"
   const rows = a.checks.map(c =>
     "<tr>" +
     "<td style='padding:8px 10px;border-bottom:1px solid #e6ebe9;'>" + esc(c.label) + "</td>" +
     "<td align='center' style='padding:8px 10px;border-bottom:1px solid #e6ebe9;'>" + c.v + "</td>" +
     "<td align='center' style='padding:8px 10px;border-bottom:1px solid #e6ebe9;color:#8a9995;'>" + c.p + "</td>" +
-    "<td align='center' style='padding:8px 10px;border-bottom:1px solid #e6ebe9;font-weight:700;color:" + (c.ok ? '#1f6f5c' : RED) + ";'>" + (c.ok ? '&#10003;' : '&#10007;') + "</td>" +
+    "<td align='center' style='padding:8px 10px;border-bottom:1px solid #e6ebe9;font-weight:700;'>" + markCell(weekend ? 'neutral' : markOfCheck(c)) + "</td>" +
     "</tr>").join('')
 
   // Banner: red when the system failed; green "did its job" only when nothing is overdue either,
@@ -70,11 +79,11 @@ export function buildEmail(a: {
     ? "<div style='background:#fdecea;border-left:5px solid " + RED + ";border-radius:6px;padding:18px 24px;margin-bottom:16px;'>" +
       "<div style='font-size:17px;font-weight:700;color:#8e2318;margin-bottom:6px;'>&#9888; BIG WARNING — the system did not do its daily job</div>" +
       "<div style='font-size:14px;color:#5a1c14;line-height:1.55;'>" + a.warnings.map(w => '&bull; ' + w).join('<br>') + "</div></div>"
-    : a.overdue > 0
+    : a.overdue > 0 && !weekend
       ? "<div style='background:#ffffff;border-left:5px solid " + RED + ";border-radius:6px;padding:18px 24px;margin-bottom:16px;'>" +
         "<div style='font-size:17px;font-weight:700;color:#8e2318;margin-bottom:6px;'>" + esc(a.summary.bannerTitle) + "</div>" +
         "<div style='font-size:14px;color:#1d4a3d;line-height:1.55;'>" + doneLine + "</div></div>"
-      : a.summary.nothingHappened
+      : a.summary.nothingHappened || weekend
         ? "<div style='background:#ffffff;border-left:5px solid #8a9995;border-radius:6px;padding:18px 24px;margin-bottom:16px;'>" +
           "<div style='font-size:17px;font-weight:700;color:#12352c;margin-bottom:6px;'>" + esc(a.summary.bannerTitle) + "</div>" +
           "<div style='font-size:14px;color:#1d4a3d;line-height:1.55;'>" + doneLine + "</div></div>"
@@ -83,7 +92,12 @@ export function buildEmail(a: {
           "<div style='font-size:14px;color:#1d4a3d;line-height:1.55;'>" + doneLine + "</div></div>"
 
   // Any overdue task is red, whatever the trend.
-  const overdueHtml = a.overdue > 0
+  // On a weekend day the same facts are shown neutrally (grey, no ✗): weekends are not scored.
+  const overdueHtml = a.overdue > 0 && weekend
+    ? "<div style='background:#ffffff;border-left:5px solid " + GREY + ";border-radius:6px;padding:18px 24px;margin-bottom:16px;'>" +
+      "<div style='font-size:16px;font-weight:700;color:#12352c;margin-bottom:6px;'>" + a.overdue + " overdue task(s)" + (a.overdueTrend ? ' — ' + esc(a.overdueTrend) : '') + "</div>" +
+      "<div style='font-size:14px;color:#5b6b66;'>Carried over from the week; weekend days are not scored.</div></div>"
+    : a.overdue > 0
     ? "<div style='background:#fdecea;border-left:5px solid " + RED + ";border-radius:6px;padding:18px 24px;margin-bottom:16px;'>" +
       "<div style='font-size:16px;font-weight:700;color:#8e2318;margin-bottom:6px;'>&#10007; " + a.overdue + " overdue task(s)" + (a.overdueTrend ? ' — ' + esc(a.overdueTrend) : '') + "</div>" +
       "<div style='font-size:14px;color:#5a1c14;'>Open tasks whose due date has already passed. Clear or re-date them in the app.</div></div>"
@@ -99,7 +113,7 @@ export function buildEmail(a: {
     warnHtml +
     (a.summary.quietNote ? "<div style='background:#f0f4f3;border-radius:6px;padding:12px 24px;margin-bottom:16px;font-size:14px;color:#5b6b66;'>" + esc(a.summary.quietNote) + "</div>" : '') +
     "<div style='background:#ffffff;border-radius:6px;padding:20px 24px;margin-bottom:16px;'>" +
-      "<div style='font-size:16px;font-weight:700;color:#12352c;margin-bottom:12px;'>Progress score: " + a.summary.score + " / " + a.summary.max + " measures met</div>" +
+      "<div style='font-size:16px;font-weight:700;color:#12352c;margin-bottom:12px;'>" + (weekend ? esc(a.summary.scoreLine) : 'Progress score: ' + esc(a.summary.scoreLine)) + "</div>" +
       "<table style='width:100%;border-collapse:collapse;font-size:14px;'>" +
       "<tr style='background:#f0f4f3;'><th align='left' style='padding:8px 10px;color:#12352c;'>Measure</th>" +
       "<th align='center' style='padding:8px 10px;color:#12352c;'>Yesterday</th>" +
@@ -115,7 +129,7 @@ export function buildEmail(a: {
       "<tr><td style='padding:6px 0;color:#5b6b66;width:52%;'>Overall completion</td><td style='padding:6px 0;'><b>" + a.pct + "%</b> — " + a.tasksDone + "/" + a.tasksTotal + " tasks done</td></tr>" +
       "<tr><td style='padding:6px 0;color:#5b6b66;'>Active projects</td><td style='padding:6px 0;'>" + a.activeProjects + "</td></tr>" +
       "<tr><td style='padding:6px 0;color:#5b6b66;'>Clients</td><td style='padding:6px 0;'>" + a.clientsTotal + "</td></tr>" +
-      "<tr><td style='padding:6px 0;color:#5b6b66;'>Overdue tasks</td><td style='padding:6px 0;" + (a.overdue > 0 ? 'color:' + RED + ';font-weight:700;' : '') + "'>" + a.overdue + "</td></tr>" +
+      "<tr><td style='padding:6px 0;color:#5b6b66;'>Overdue tasks</td><td style='padding:6px 0;" + (a.overdue > 0 ? 'color:' + (weekend ? '#12352c' : RED) + ';font-weight:700;' : '') + "'>" + a.overdue + "</td></tr>" +
       "<tr><td style='padding:6px 0;color:#5b6b66;'>Last change of any kind</td><td style='padding:6px 0;'>" + esc(a.lastChangeText) + "</td></tr>" +
       "</table>" +
     "</div>" +

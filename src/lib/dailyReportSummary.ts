@@ -41,9 +41,26 @@ export function isQuietDay(reportedYmd: string): boolean {
   return isWeekend(reportedYmd)
 }
 
+// Mark for one of the 6 measures: ✓ met, ✗ not met, – neutral (not scored).
+export type Mark = 'ok' | 'fail' | 'neutral'
+
+// One rule for every measure's mark:
+//  - weekend (reported ET day is Sat/Sun): the 6 weekday measures are not scored, all neutral;
+//  - met: ✓;
+//  - a level measure (e.g. Completion %) whose value did not change ("78 → 78"): neutral –, not ✗;
+//  - otherwise ✗. Daily counts (0 created) and overdue (any > 0) keep their own ✗ rule.
+export function markOf(c: { v: number; p: number; ok: boolean; unchangedIsNeutral?: boolean }, weekend: boolean): Mark {
+  if (weekend) return 'neutral'
+  if (c.ok) return 'ok'
+  if (c.unchangedIsNeutral && c.v === c.p) return 'neutral'
+  return 'fail'
+}
+
 export type ReportSummary = {
   score: number          // 0-6, computed once from the checks
   max: number
+  scored: boolean        // false on weekend days: no score is shown anywhere
+  scoreLine: string      // the score as shown in the subject, header and body
   alarm: boolean         // nothing happened on a working day
   nothingHappened: boolean
   quietNote: string | null
@@ -68,28 +85,40 @@ export function overdueCheck(overdue: number, prevOverdue: number | null): { ok:
   return { ok, why, trend }
 }
 
+export const WEEKEND_NOT_SCORED = 'Weekend — not scored'
+
 // `todayYmd` is kept for callers but no longer decides anything: only the reported day does.
-export function summarize(opts: { score: number; max?: number; nothingHappened: boolean; todayYmd?: string; reportedYmd: string; overdue?: number }): ReportSummary {
+// `unchanged` = measures marked neutral because their value did not change (weekday only).
+export function summarize(opts: { score: number; max?: number; nothingHappened: boolean; todayYmd?: string; reportedYmd: string; overdue?: number; unchanged?: number }): ReportSummary {
   const max = opts.max ?? 6
   const quiet = isQuietDay(opts.reportedYmd)
   const alarm = opts.nothingHappened && !quiet
   const overdue = opts.overdue ?? 0
+  const unchanged = opts.unchanged ?? 0
   // The score counts measures met (of 6), it is not an activity count: label it as such so
-  // "No task changes" next to it does not read as a contradiction. The overdue count is part of
-  // the headline so it can never read better than the tiles below it.
-  const scoreText = opts.score + '/' + max + ' measures met' + (overdue > 0 ? ' · ' + overdue + ' overdue' : '')
+  // "No task changes" next to it does not read as a contradiction. On a weekend day the 6
+  // weekday measures are not scored at all, so subject, header and body all say so (no "0/6").
+  const scoreLine = quiet ? WEEKEND_NOT_SCORED
+    : opts.score + '/' + max + ' measures met' + (unchanged > 0 ? ' · ' + unchanged + ' unchanged' : '')
+  // The overdue count is part of the headline so it can never read better than the tiles below it.
+  const scoreText = scoreLine + (overdue > 0 ? ' · ' + overdue + ' overdue' : '')
   const overdueTail = overdue > 0 ? ', ' + overdue + ' task(s) still overdue' : ''
+  const day = WEEKDAYS[weekdayOf(opts.reportedYmd)]
   return {
     score: opts.score,
     max,
+    scored: !quiet,
+    scoreLine,
     alarm,
     nothingHappened: opts.nothingHappened,
-    quietNote: opts.nothingHappened && quiet ? 'Quiet weekend day (' + WEEKDAYS[weekdayOf(opts.reportedYmd)] + '): no activity was expected, so this is not flagged.' : null,
+    quietNote: !quiet ? null
+      : opts.nothingHappened ? 'Quiet weekend day (' + day + '): no activity was expected, so this is not flagged and the 6 weekday measures are not scored.'
+      : 'Weekend day (' + day + '): activity is shown below, but the 6 weekday measures are not scored.',
     subjectTail: opts.nothingHappened ? 'No task changes · ' + scoreText : scoreText,
     headerLine: opts.nothingHappened ? 'No task changes yesterday · ' + scoreText : scoreText,
     // "Work moved" only when something was actually created/touched on the reported day.
     bannerTitle: opts.nothingHappened ? 'No task changes yesterday' + overdueTail
-      : overdue > 0 ? 'Work moved, but ' + overdue + ' task(s) are still overdue'
+      : overdue > 0 ? (quiet ? 'Work moved; ' + overdue + ' task(s) still overdue' : 'Work moved, but ' + overdue + ' task(s) are still overdue')
       : 'The system did its job',
   }
 }
