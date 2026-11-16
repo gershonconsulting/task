@@ -67,6 +67,20 @@ CI            : .github/
   conflicted #10, built on main and carrying #8's one-score change).
 
 
+2026-11-16 nightly — daily report: weekends not scored, unchanged != ✗ (PR nightly/2026-11-16-task-daily-weekend, v1.3.7, stacked on #22)
+----------------------------------------------------------------
+- Why: audit of the Saturday 2026-11-14 e-mail: "0/6 measures met" in red while the body said "not flagged" (weekend), and
+  "Completion % 78 -> 78" marked ✗.
+- ✅ Weekend = the REPORTED America/New_York day is Sat/Sun (same rule as v1.3.5; Saturday's run reports Friday = working day, scored).
+  On a weekend day: subject/header/body say "Weekend — not scored", the 6 measures show a grey –, no "What did not move" list,
+  banner / overdue tile / late days are grey, no red anywhere (except a real missed-run system warning).
+- ✅ markOf() in src/lib/dailyReportSummary.ts: weekend -> neutral; met -> ✓; level measure unchanged (Completion %) -> – (not ✗,
+  not in the failure list); else ✗. Score line "x/6 measures met · n unchanged" comes from summary.scoreLine for subject AND body.
+- ✅ scripts/daily-weekend-check.ts (weekend Sat/Sun with and without overdue, unchanged 78->78, subject = body); daily-wording-check
+  updated; daily-activity-check + resend-retry-check pass; tsc --noEmit, next build and @cloudflare/next-on-pages pass.
+- ❌ Overdue row unchanged and > 0 is still ✗ (earlier explicit rule "43 -> 43 is not progress"); needs Olivier's call.
+- ❌ Not deployed (merge #22 then this PR to main; Cloudflare Pages auto-builds).
+
 2026-11-16 nightly — Resend retry with one Idempotency-Key per e-mail (PR nightly/2026-11-16-task-resend-retry, v1.3.6)
 ----------------------------------------------------------------
 - Why: 2026-11-13 18:20-21:54 UTC Resend failed and the Task daily e-mail was never retried.
