@@ -41,3 +41,12 @@ A real send to report@ (relay or legacy) uses the Resend `Idempotency-Key` `clie
 A second non-dry send in the same window gets `{"ok":false,"skipped":true}` instead of a second e-mail.
 Resend keeps keys for 24 hours, which covers same-day re-runs (the 2026-11-02 duplicate was 5 h apart).
 `testTo` sends carry no key; `force:true` deliberately sends again.
+
+## Once per REPORT week (v5.3, 2026-11-17)
+2026-11-16 duplicate: 13:00 UTC relay "W46 · 9–15 Nov 2026" + 13:14 UTC legacy "week of Nov 16, 2026" (direct call with force:true).
+Now both paths use the report week (the ISO week that ended before the send, Mon 2026-11-16 -> 2026-W46), the label
+"W46 · 9–15 Nov 2026", the Resend key `client-matrix-2026-W46`, and the marker `cc_health_config.matrix_last_sent_week`
+(survives Resend's 24 h key window). A second send that week answers `{"ok":false,"skipped":true}`.
+`force:true` no longer bypasses; a deliberate re-send needs `force:"2026-W46"`. `testTo` is unchanged.
+Resend network/429/5xx are retried twice (2 s, 8 s) with the same key. Files: `index.ts` + `week.ts` (deploy both).
+Check: `npx tsx scripts/matrix-once-check.ts`.
