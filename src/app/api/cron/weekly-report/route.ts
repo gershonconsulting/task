@@ -2,7 +2,7 @@ export const runtime = 'edge'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseServer'
-import { sendResendEmail } from '@/lib/resendSend'
+import { sendResendEmail, retryFailedSends, type ResendPayload, type ResendResult } from '@/lib/resendSend'
 import { readEnv, siteUrl } from '@/lib/site'
 import { loadTeam, OWNER_EMAILS, type TeamMember } from '@/lib/team'
 import { etToday, loadMyWork, type MyWork, type WorkTask } from '@/lib/myWork'
@@ -85,10 +85,23 @@ function buildEmail(m: TeamMember, w: MyWork): { subject: string; html: string }
   return { subject, html }
 }
 
-async function sendOne(key: string, to: string, subject: string, html: string) {
-  // Retries 429/5xx/network with one Idempotency-Key per logical send (src/lib/resendSend.ts).
-  const r = await sendResendEmail(key, { from: FROM, to: [to], subject, html }, { label: 'task-weekly' })
-  return { ok: r.ok, id: r.body.id, error: r.ok ? undefined : (r.body.message ?? r.status), attempts: r.attempts }
+// v1.3.8: a stable Idempotency-Key per Friday and recipient (key = null -> fresh key, for tests and
+// force=1), and every accepted e-mail is checked once; one Resend marked "failed" is resent once
+// (2026-11-13 "GC Task · My Tasks" was accepted, then failed, and never resent).
+type Sent = { payload: ResendPayload; result: ResendResult }
+async function sendOne(key: string, to: string, subject: string, html: string, idem: string | null, batch?: Sent[]) {
+  const payload = { from: FROM, to: [to], subject, html }
+  const result = await sendResendEmail(key, payload, { label: 'task-weekly', idempotencyKey: idem ?? undefined })
+  if (batch) batch.push({ payload, result })
+  return view(result)
+}
+function view(r: ResendResult & { retried?: boolean }) {
+  return { ok: r.ok || !!r.duplicate, id: r.body.id, error: r.ok || r.duplicate ? undefined : (r.body.message ?? r.status), attempts: r.attempts, alreadySent: r.duplicate || undefined, retried: r.retried || undefined }
+}
+/** One shared wait, then resend once whatever Resend marked failed; returns the final view per item. */
+async function confirmBatch(key: string, batch: Sent[]) {
+  const outs = await retryFailedSends(key, batch.map(b => ({ ...b, label: 'task-weekly' })))
+  return outs.map(view)
 }
 
 export async function GET(req: NextRequest) {
@@ -117,9 +130,13 @@ export async function POST(req: NextRequest) {
   const only = (sp.get('only') || '').toLowerCase().trim()
   const supa = supabaseAdmin()
 
+  const force = !!sp.get('force')
   const sendMaster = async (to: string, test: boolean) => {
     const { subject, html } = await buildMasterReport(team)
-    return { report: 'master', to, ...(await sendOne(key, to, (test ? '[test] ' : '') + subject, html)) }
+    const batch: Sent[] = []
+    await sendOne(key, to, (test ? '[test] ' : '') + subject, html, test || force ? null : 'task-master/' + today, batch)
+    const [v] = await confirmBatch(key, batch)
+    return { report: 'master', to, ...v }
   }
   const masterDue = async () => {
     const { data } = await supa.from('app_settings').select('value').eq('key', MASTER_STATE_KEY).maybeSingle()
@@ -146,7 +163,7 @@ export async function POST(req: NextRequest) {
     if (!allowed) return NextResponse.json({ error: 'only= must be a registered member or the owner' }, { status: 400 })
     const m = team.find(t => t.id === sp.get('member')) ?? team.find(t => t.email.toLowerCase() === only) ?? team[0]
     const { subject, html } = buildEmail(m, await loadMyWork(m))
-    const r = await sendOne(key, only, '[test] ' + subject, html)
+    const r = await sendOne(key, only, '[test] ' + subject, html, null)
     return NextResponse.json({ test: true, to: only, member: m.name, ...r }, { status: r.ok ? 200 : 502 })
   }
 
@@ -154,12 +171,17 @@ export async function POST(req: NextRequest) {
   const last = st?.value ? (JSON.parse(st.value) as { date?: string }).date : undefined
   const membersDue = last !== today || !!sp.get('force')
 
-  const results: { member?: string; report?: string; to?: string; ok: boolean; id?: string; error?: unknown }[] = []
+  const results: { member?: string; report?: string; to?: string; ok: boolean; id?: unknown; error?: unknown; retried?: boolean; alreadySent?: boolean }[] = []
+  const batch: Sent[] = []
+  const batchIdx: number[] = []
   for (const m of membersDue ? team : []) {
     if (!m.email) { results.push({ member: m.name, ok: false, error: 'no email' }); continue }
     const { subject, html } = buildEmail(m, await loadMyWork(m))
-    results.push({ member: m.name, to: m.email, ...(await sendOne(key, m.email, subject, html)) })
+    batchIdx.push(results.length)
+    results.push({ member: m.name, to: m.email, ...(await sendOne(key, m.email, subject, html, force ? null : 'task-weekly/' + today + '/' + m.email.toLowerCase(), batch)) })
   }
+  // One check for the whole batch; anything Resend failed after accepting is resent once.
+  if (batch.length) (await confirmBatch(key, batch)).forEach((v, n) => { results[batchIdx[n]] = { ...results[batchIdx[n]], ...v } })
   const sent = results.filter(r => r.ok).length
   if (sent) await supa.from('app_settings').upsert({ key: STATE_KEY, value: JSON.stringify({ date: today, sent, at: new Date().toISOString() }) }, { onConflict: 'key' })
 
