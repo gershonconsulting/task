@@ -67,6 +67,28 @@ CI            : .github/
   conflicted #10, built on main and carrying #8's one-score change).
 
 
+2026-11-17 nightly — internal e-mails: matrix once per week + resend after Resend "failed" (PR nightly/2026-11-17-task-emails, v1.3.8)
+----------------------------------------------------------------
+- Why 1: 2026-11-16 report@ got the Client Platform Matrix twice. Resend list: 13:00:12 UTC "Client Platform Matrix · W46 · 9–15 Nov 2026"
+  (from GC Health = relay: pg_cron job 3 -> health.gershon.ai -> functions/v1/client-platform-matrix, Resend key client-matrix-2026-W47) and
+  13:14:11 UTC "Client Platform Matrix · week of Nov 16, 2026" (from GC Client Matrix = legacy self-built send, a one-off direct pg_net call
+  to the function with force:true, which by design carried NO idempotency key; no cron job does this - job 3 is the only matrix job).
+- ✅ Function v5.3 (supabase/functions/client-platform-matrix/index.ts + new week.ts): ONE report week for both paths = the ISO week that ended
+  before the send (Mon 11-16 -> 2026-W46), one label "W46 · 9–15 Nov 2026" (same as health), Resend key client-matrix-2026-W46, a durable
+  marker cc_health_config.matrix_last_sent_week (Resend keeps keys only 24 h), force:true no longer bypasses (force:"2026-W46" does), testTo
+  unchanged. Resend network/429/5xx retried twice (2 s, 8 s) with the same key. Index.ts now = deployed v7 (v5.2 "0 output = red", which was
+  only in Supabase) + v5.3. scripts/matrix-once-check.ts 3/3; deno check passes.
+- Why 2: 2026-11-13 18:20 UTC daily report (for 11-12) and 19:19 UTC "GC Task · My Tasks" were ACCEPTED by Resend (200 + id) then marked
+  "failed" (no message id). The v1.3.6 HTTP retry never saw an error, so nothing was resent.
+- ✅ src/lib/resendSend.ts retryFailedSends(): 20 s after sending, read GET /emails/{id}; only if "failed", wait 30 s and send ONCE more with
+  the fixed key "<key>:retry1" (the original key would just return the failed e-mail; a fixed second key keeps re-runs duplicate-free).
+  Stable keys now: task-daily/<reported day>/primary|fallback, task-weekly/<Friday>/<email>, task-master/<Friday> (tests and force=1 keep a
+  fresh key). 409 invalid_idempotent_request = already sent (no fallback e-mail). scripts/resend-failed-retry-check.ts 5/5.
+- ✅ tsc --noEmit, next build, @cloudflare/next-on-pages, all 6 check scripts pass. No e-mail was sent to test.
+- Deploy: app = deploy.yml on merge to main; function = redeployed by hand from merged main (index.ts + week.ts, verify_jwt false).
+- ❌ Needs the task app's RESEND_API_KEY to be allowed to READ e-mails (full access). With a "sending only" key the status read returns 401/403,
+  is logged "[resend] status read ... HTTP 403", and no resend happens (sending itself is unaffected).
+
 2026-11-16 nightly — daily report: weekends not scored, unchanged != ✗ (PR nightly/2026-11-16-task-daily-weekend, v1.3.7, stacked on #22)
 ----------------------------------------------------------------
 - Why: audit of the Saturday 2026-11-14 e-mail: "0/6 measures met" in red while the body said "not flagged" (weekend), and

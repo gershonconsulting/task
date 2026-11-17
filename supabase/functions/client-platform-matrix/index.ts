@@ -9,15 +9,19 @@
 // POST body: { secret, format?: "json" }                         -> structured data for health.gershon.ai
 //            { secret, html, subject, testTo? }                  -> send health.gershon.ai's email (relay)
 //            { secret, dry?: true, testTo? }                     -> legacy self-built email (kept as fallback)
-//            force?: true on either send path                    -> send again this ISO week (bypasses the guard)
+//            force?: "<report week>" on either send path        -> deliberate second send for that week
 //
-// v5.1 (2026-11-07, replaces PR #13 which was built on pre-v5 code): once per ISO week.
-// A real send to report@ (relay or legacy) carries the Resend Idempotency-Key
-// "client-matrix-<YYYY>-W<ww>" (ISO week, UTC). The relay and the legacy fallback share the
-// key, so a fallback run after a health.gershon.ai send (or a manual re-run, like 2026-11-02
-// 18:21 UTC after the 13:00 UTC cron send) is refused by Resend instead of mailing report@ twice.
-// Resend keeps a key for 24 h, so this guards same-day re-runs, not a whole week.
-// testTo sends get no key (tests stay repeatable); force:true skips the key on purpose.
+// v5.1 (2026-11-07): once per ISO week via Resend Idempotency-Key "client-matrix-<YYYY>-W<ww>".
+// v5.2 (2026-11-16): a platform that delivers NOTHING is never a green check. Olivier: "0 leads on
+// Radar is not green". Radar with 0 profiles, and any live cell whose note starts with "0 "
+// (0 posts, 0 reposts, 0 collected, 0 convos) is now ok:false (red ✗). Having an account is not
+// success. Warnings ("no scan for 3d") now render orange in the fallback email instead of green.
+// v5.3 (2026-11-17): once per REPORT week for real (see week.ts): one week label for relay and legacy
+// ("W46 · 9–15 Nov 2026"), Resend key per report week, durable marker cc_health_config
+// matrix_last_sent_week, force:true no longer bypasses (force:"2026-W46" does), and Resend
+// network/429/5xx failures are retried twice (2 s, 8 s) with the same key.
+
+import { reportWeek, weekLabel as reportWeekLabel, planSend, postResend } from "./week.ts";
 
 const SB_URL = Deno.env.get("SUPABASE_URL")!;
 const SB_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -45,47 +49,51 @@ const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&
 const lc = (s: string) => (s || "").toLowerCase().trim();
 type Cell = { ok: boolean | null; note?: string; warn?: boolean };
 const warnRe = /never|no scan|0 collected|red/;
-const cellOf = (ok: boolean, note?: string | null): Cell => ({ ok, note: note || undefined, warn: warnRe.test(note || "") });
+// Zero output = not delivering = red, whatever the account status says.
+const zeroRe = /^0 (collected|posts|reposts|profiles|convos|prospects|leads)\b/i;
+const cellOf = (ok: boolean, note?: string | null): Cell => {
+  const n = note || "";
+  if (ok && zeroRe.test(n)) return { ok: false, note: n };
+  return { ok, note: n || undefined, warn: warnRe.test(n) };
+};
 
 function mark(c: Cell) {
   const td = (inner: string) => `<td style="padding:8px 4px;border-bottom:1px solid #dfe5ee;text-align:center">${inner}</td>`;
   const note = c.note ? `<div style="font-size:10px;color:${c.warn ? "#9a6a00" : "#5d6b80"};margin-top:2px;white-space:nowrap">${esc(c.note)}</div>` : "";
   if (c.ok === null) return td(`<span style="display:inline-block;width:22px;height:22px;line-height:22px;border-radius:11px;background:#eef1f5;color:#9aa5b5;font-weight:700;font-size:13px">&ndash;</span>${note}`);
-  const bg = c.ok ? "#e3f5ea" : "#fbe7e5", fg = c.ok ? "#138a4b" : "#c4352b";
-  return td(`<span style="display:inline-block;width:22px;height:22px;line-height:22px;border-radius:11px;background:${bg};color:${fg};font-weight:700;font-size:13px">${c.ok ? "&#10003;" : "&#10007;"}</span>${note}`);
+  const [bg, fg] = !c.ok ? ["#fbe7e5", "#c4352b"] : c.warn ? ["#fde7c4", "#b76b00"] : ["#e3f5ea", "#138a4b"];
+  return td(`<span style="display:inline-block;width:22px;height:22px;line-height:22px;border-radius:11px;background:${bg};color:${fg};font-weight:700;font-size:13px">${!c.ok ? "&#10007;" : c.warn ? "!" : "&#10003;"}</span>${note}`);
 }
 
-// ISO-8601 week of a UTC date, e.g. 2026-11-02 -> "2026-W45".
-function isoWeek(d = new Date()) {
-  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  const day = t.getUTCDay() || 7;
-  t.setUTCDate(t.getUTCDate() + 4 - day);
-  const y = t.getUTCFullYear();
-  const w = Math.ceil(((t.getTime() - Date.UTC(y, 0, 1)) / 86400000 + 1) / 7);
-  return `${y}-W${String(w).padStart(2, "0")}`;
+const MARK_KEY = "matrix_last_sent_week";
+
+async function setCfg(key: string, value: string) {
+  const r = await fetch(`${SB_URL}/rest/v1/cc_health_config?on_conflict=key`, {
+    method: "POST",
+    headers: { ...H, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({ key, value, updated_at: new Date().toISOString() }),
+  });
+  if (!r.ok) console.error(`[matrix] could not record ${key}=${value}: ${r.status}`);
 }
 
-function weekLabel() {
-  const ny = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
-  ny.setDate(ny.getDate() - ((ny.getDay() + 6) % 7));
-  return "week of " + ny.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-async function sendMail(to: string[], subject: string, html: string, from: string, idemKey: string | null = null) {
+// One send to report@ per report week (relay and legacy share the plan, the key and the marker).
+async function sendMail(body: any, to: string[], subject: string, html: string, from: string) {
+  const week = reportWeek();
+  const plan = planSend({ week, testTo: body.testTo, force: body.force, lastSentWeek: body.testTo ? null : await cfg(MARK_KEY) });
+  if (plan.action === "skip") return json({ ok: false, skipped: true, week: week.id, error: plan.reason });
   const key = await cfg("resend_api_key");
   if (!key) return json({ ok: false, error: "no resend key" });
-  const r = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", ...(idemKey ? { "Idempotency-Key": idemKey } : {}) },
-    body: JSON.stringify({ from, to, reply_to: REPLY_TO, subject, html }),
-  });
-  const out = await r.json().catch(() => ({}));
-  // Resend answers 409 when the key was already used this window with a different body.
-  if (r.status === 409 && idemKey) {
-    return json({ ok: false, skipped: true, error: `already sent this week (${idemKey}); pass force:true to send again`, out });
+  const r = await postResend(key, { from, to, reply_to: REPLY_TO, subject, html }, plan.idemKey);
+  if (r.skipped) {
+    if (plan.markWeek) await setCfg(MARK_KEY, plan.markWeek);
+    return json({ ok: false, skipped: true, week: week.id, error: `already sent this week (${plan.idemKey}); pass force:"${week.id}" to send again`, out: r.body });
   }
-  if (!r.ok) return json({ ok: false, error: "resend " + r.status, out });
-  return json({ ok: true, id: (out as any).id, to, idempotencyKey: idemKey });
+  if (!r.ok) {
+    console.error(`[matrix] resend FINAL FAILURE after ${r.attempts} attempt(s): ${r.status || "network"} ${r.error} (key ${plan.idemKey})`);
+    return json({ ok: false, error: "resend " + (r.status || "network"), attempts: r.attempts, out: r.body });
+  }
+  if (plan.markWeek) await setCfg(MARK_KEY, plan.markWeek);
+  return json({ ok: true, id: (r.body as any).id, to, week: week.id, idempotencyKey: plan.idemKey, attempts: r.attempts });
 }
 
 Deno.serve(async (req) => {
@@ -97,13 +105,10 @@ Deno.serve(async (req) => {
   // Test sends only ever go to an internal address.
   if (body.testTo && !/^[^@\s]+@gershonconsulting\.com$/i.test(String(body.testTo))) return json({ ok: false, error: "testTo must be an @gershonconsulting.com address" }, 400);
 
-  // Once per ISO week to report@; test sends and force:true carry no key.
-  const idemKey = body.testTo || body.force ? null : `client-matrix-${isoWeek()}`;
-
   // Relay: health.gershon.ai built the email; this function only sends it.
   if (typeof body.html === "string" && typeof body.subject === "string") {
     const to = body.testTo ? [String(body.testTo)] : TO;
-    return sendMail(to, body.subject.slice(0, 200), body.html, FROM_HEALTH, idemKey);
+    return sendMail(body, to, body.subject.slice(0, 200), body.html, FROM_HEALTH);
   }
 
   try {
@@ -152,20 +157,20 @@ Deno.serve(async (req) => {
       if (col.key === "radar") {
         if (radarErr) return { ok: false, note: "Radar unreachable", warn: true };
         const ru = (r.emails || []).map(lc).map((e: string) => radarBy.get(e)).find(Boolean);
-        if (!ru) return { ok: false };
-        return Number(ru.targets) > 0 ? { ok: true, note: `${Number(ru.targets).toLocaleString("en-US")} profiles` } : { ok: true, note: "0 collected", warn: true };
+        if (!ru) return { ok: false, note: "no account" };
+        return Number(ru.targets) > 0 ? { ok: true, note: `${Number(ru.targets).toLocaleString("en-US")} profiles` } : { ok: false, note: "0 collected" };
       }
       const stale = liveErr[col.key] ? " (recorded)" : "";
       const c = (r.cells || {})[col.key];
-      if (c && typeof c.ok === "boolean") return { ...cellOf(c.ok, (c.note || "") + stale), warn: !!stale || warnRe.test(c.note || "") };
-      if (LEGACY.has(col.key)) return { ...cellOf(!!r[col.key], (r[col.key + "_note"] || "") + stale), warn: !!stale };
+      if (c && typeof c.ok === "boolean") { const o = cellOf(c.ok, (c.note || "") + stale); return o.ok ? { ...o, warn: !!stale || !!o.warn } : o; }
+      if (LEGACY.has(col.key)) { const o = cellOf(!!r[col.key], (r[col.key + "_note"] || "") + stale); return o.ok ? { ...o, warn: !!stale || !!o.warn } : o; }
       return { ok: null };
     };
 
     const clients = rows.filter((r) => r.section === "client").map((r) => ({ ...r, cellsOut: cols.map((c) => cellFor(r, c)) }));
     const socialOnly: string[] = socialOthers ?? rows.filter((r) => r.section === "social_only").map((r) => r.company);
 
-    const period = weekLabel();
+    const period = reportWeekLabel(reportWeek());
     const companies = [...new Set(clients.map((r) => r.company))];
     const full = companies.filter((co) => cols.every((_, i) => clients.some((r) => r.company === co && r.cellsOut[i].ok === true)));
     const isLive = (c: any) => (c.key === "radar" && !radarErr) || !!liveBy[c.key];
@@ -197,7 +202,7 @@ Deno.serve(async (req) => {
     let rowsHtml = "", last = "";
     for (const r of clients) {
       if (r.company !== last) {
-        rowsHtml += `<tr><td colspan="${cols.length + 1}" style="padding:8px 6px;background:#fff5f5;font-weight:800;color:#d11200">${esc(r.company)} <span style="font-weight:400;font-size:11px;color:#5d6b80">${esc(r.flexi_id || "")}</span></td></tr>`;
+        rowsHtml += `<tr><td colspan="${cols.length + 1}" style="padding:8px 6px;background:#fdf2f2;font-weight:800;color:#a8281f">${esc(r.company)} <span style="font-weight:400;font-size:11px;color:#5d6b80">${esc(r.flexi_id || "")}</span></td></tr>`;
         last = r.company;
       }
       rowsHtml += `<tr><td style="padding:8px 6px;border-bottom:1px solid #dfe5ee"><div style="font-weight:600">${esc(r.person)}</div><div style="font-size:10px;color:#5d6b80">${esc((r.emails || []).join(" · "))}</div></td>${r.cellsOut.map(mark).join("")}</tr>`;
@@ -208,7 +213,7 @@ Deno.serve(async (req) => {
 <div style="max-width:900px;margin:0 auto;padding:20px 10px">
 <div style="background:#fff;border:1px solid #dfe5ee;border-radius:12px;padding:18px;overflow-x:auto">
 <div style="font-size:22px;font-weight:800;color:#152033">Client Platform Matrix · ${esc(period)}</div>
-<p style="color:#5d6b80;margin:6px 0 14px;font-size:13px">${companies.length} clients, ${clients.length} people across ${cols.length} platforms.${full.length ? ` <b style="color:#152033">${full.map(esc).join(" and ")}</b> ${full.length > 1 ? "are" : "is"} on all of them.` : ""} <a href="${BOARD_URL}" style="color:#FE1B04">Open the live board</a></p>
+<p style="color:#5d6b80;margin:6px 0 14px;font-size:13px">${companies.length} clients, ${clients.length} people across ${cols.length} platforms.${full.length ? ` <b style="color:#152033">${full.map(esc).join(" and ")}</b> ${full.length > 1 ? "deliver" : "delivers"} on all of them.` : ""} Green = delivering, orange = delivering with a warning, red = no output. <a href="${BOARD_URL}" style="color:#FE1B04">Open the live board</a></p>
 <table style="border-collapse:collapse;width:100%;font-size:13px;color:#152033">${head}${rowsHtml}</table>
 ${socialOnly.length ? `<div style="font-weight:800;margin:20px 0 6px">Other companies tracked in Social</div>${chips(socialOnly)}` : ""}
 <p style="color:#8a96a8;font-size:11px;margin:18px 0 0;line-height:1.5">Live at send time: ${esc(live.join(", ") || "none")}${radarErr ? " (Radar failed: " + esc(radarErr) + ")" : ""}. Last recorded: ${esc(manual.join("; ") || "none")}${pending.length ? ". Not connected yet (shown as &ndash;): " + esc(pending.join(", ")) : ""}. Fallback copy sent by the task database.</p>
@@ -216,7 +221,7 @@ ${socialOnly.length ? `<div style="font-weight:800;margin:20px 0 6px">Other comp
 
     if (body.dry) return new Response(html, { headers: { "Content-Type": "text/html" } });
     const to = body.testTo ? [body.testTo] : TO;
-    return sendMail(to, `Client Platform Matrix · ${period}`, html, FROM, idemKey);
+    return sendMail(body, to, `Client Platform Matrix · ${period}`, html, FROM);
   } catch (e) {
     return json({ ok: false, error: String(e) }, 200);
   }

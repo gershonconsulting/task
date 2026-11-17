@@ -4,7 +4,7 @@ import { siteUrl } from '@/lib/site'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { supabaseAdmin } from '@/lib/supabaseServer'
-import { sendResendEmail } from '@/lib/resendSend'
+import { sendResendEmail, retryFailedSends } from '@/lib/resendSend'
 import { summarize, markOf, isQuietDay, overdueCheck, lastChange, canonicalOwner, nyYmd, reportDays } from '@/lib/dailyReportSummary'
 import { buildEmail, esc, longDate, type Check, type DayCounts, type Snapshot, type StuckTask } from '@/lib/dailyReportEmail'
 
@@ -154,22 +154,26 @@ async function handle(req: NextRequest, preview: boolean) {
   const resendKey = readEnv('RESEND_API_KEY')
   if (!resendKey) return NextResponse.json({ error: 'RESEND_API_KEY not configured' }, { status: 500 })
 
-  const send = async (from: string, to: string[]) => {
-    // Retries 429/5xx/network with one Idempotency-Key per logical send (src/lib/resendSend.ts).
-    const r = await sendResendEmail(resendKey, { from, to, subject, html }, { label: 'task-daily' })
-    return { ok: r.ok, body: r.body, attempts: r.attempts }
+  // One stable Idempotency-Key per reported day and route (v1.3.8): a re-run of the workflow the
+  // same day cannot mail the report twice; 429/5xx/network are retried with that key
+  // (src/lib/resendSend.ts), and an e-mail Resend accepts and then marks "failed" is resent once.
+  const send = async (from: string, to: string[], route: 'primary' | 'fallback') => {
+    const payload = { from, to, subject, html }
+    const first = await sendResendEmail(resendKey, payload, { label: 'task-daily', idempotencyKey: 'task-daily/' + yYmd + '/' + route })
+    const [r] = await retryFailedSends(resendKey, [{ payload, result: first, label: 'task-daily' }])
+    return { ok: r.ok || !!r.duplicate, duplicate: !!r.duplicate, body: r.body, attempts: r.attempts, retried: !!r.retried, statusAfterSend: r.status_after_send }
   }
 
-  let delivery = await send(PRIMARY_FROM, PRIMARY_TO)
+  let delivery = await send(PRIMARY_FROM, PRIMARY_TO, 'primary')
   let usedFallback = false
   if (!delivery.ok) {
     usedFallback = true
-    delivery = await send(FALLBACK_FROM, FALLBACK_TO)
+    delivery = await send(FALLBACK_FROM, FALLBACK_TO, 'fallback')
   }
 
   // Only advance the snapshot when the report actually went out, so a failed day
   // is still reported as a missed run tomorrow.
-  if (delivery.ok) {
+  if (delivery.ok && !delivery.duplicate) {
     await supa.from('app_settings').upsert({ key: STATE_KEY, value: JSON.stringify(snapshot), updated_at: now.toISOString() }, { onConflict: 'key' })
   }
 
@@ -182,6 +186,9 @@ async function handle(req: NextRequest, preview: boolean) {
     sentFrom: usedFallback ? FALLBACK_FROM : PRIMARY_FROM,
     sentTo: usedFallback ? FALLBACK_TO : PRIMARY_TO,
     usedFallback,
+    alreadySent: delivery.duplicate,
+    retriedAfterFailed: delivery.retried,
+    statusAfterSend: delivery.statusAfterSend,
     detail: delivery.ok ? delivery.body : delivery.body,
   })
 }

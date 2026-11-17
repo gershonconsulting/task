@@ -31,6 +31,8 @@ export type ResendResult = {
   attempts: number
   idempotencyKey: string
   error?: string
+  /** 409 invalid_idempotent_request: this key was already used (another body) in the last 24 h = already sent. */
+  duplicate?: boolean
 }
 
 export type ResendOptions = {
@@ -80,6 +82,10 @@ export async function sendResendEmail(apiKey: string, payload: ResendPayload, op
     } catch (e) {
       last = { ok: false, status: 0, body: {}, attempts: attempt, idempotencyKey, error: 'network: ' + (e instanceof Error ? e.message : String(e)) }
     }
+    if (last.status === 409 && last.body?.name === 'invalid_idempotent_request') {
+      console.warn(`[resend] ${label}: idempotency key ${idempotencyKey} already used - treated as already sent`)
+      return { ...last, duplicate: true }
+    }
     if (last.ok) {
       if (attempt > 1) console.warn(`[resend] ${label}: delivered on attempt ${attempt} (idempotency ${idempotencyKey})`)
       return last
@@ -91,4 +97,58 @@ export async function sendResendEmail(apiKey: string, payload: ResendPayload, op
   }
   console.error(`[resend] ${label}: FINAL FAILURE after ${last.attempts} attempt(s) - status ${last.status || 'network'} - ${last.error} - subject "${payload.subject}" - idempotency ${idempotencyKey}`)
   return last
+}
+
+// ---------------------------------------------------------------------------------------------
+// v1.3.8 (2026-11-17): one retry when Resend ACCEPTED the e-mail and then FAILED it.
+// On 2026-11-13 the Task daily report (for 11-12, 18:20 UTC) and "GC Task · My Tasks" (19:19 UTC)
+// were accepted by the API (HTTP 200 + id) and then marked "failed" by Resend (no message id,
+// never handed to the mail provider). The HTTP retry above never saw an error, so nothing was resent.
+// Now, after a send, we wait, read the e-mail's status (GET /emails/{id}) and, only when Resend says
+// "failed", send it ONE more time after a backoff. The retry uses the deterministic key
+// "<original key>:retry1": Resend would answer the original key with the original (failed) e-mail,
+// and a fixed second key means a re-run of the retry can still never deliver twice.
+// Any other status (delivered, sent, queued, bounced, unknown, read error) = no retry.
+
+export const RESEND_CONFIRM_DELAY_MS = 20000
+export const RESEND_FAILED_RETRY_BACKOFF_MS = 30000
+
+export type ConfirmItem = { payload: ResendPayload; result: ResendResult; label?: string }
+export type ConfirmOutcome = ResendResult & { status_after_send?: string; retried?: boolean; firstId?: string }
+
+export async function readResendStatus(apiKey: string, id: string, fetchImpl: typeof fetch = fetch): Promise<string | null> {
+  try {
+    const r = await fetchImpl(RESEND_URL + '/' + encodeURIComponent(id), { headers: { Authorization: 'Bearer ' + apiKey } })
+    if (!r.ok) { console.warn(`[resend] status read for ${id}: HTTP ${r.status}`); return null }
+    const j = (await r.json().catch(() => ({}))) as { last_event?: string }
+    return typeof j.last_event === 'string' ? j.last_event : null
+  } catch (e) {
+    console.warn(`[resend] status read for ${id}: ${e instanceof Error ? e.message : String(e)}`)
+    return null
+  }
+}
+
+/**
+ * Check every accepted send once (one shared wait), and resend ONCE each one Resend marked "failed".
+ * Returns one outcome per item, in order; a retried item reports the retry's result.
+ */
+export async function retryFailedSends(apiKey: string, items: ConfirmItem[], opts: ResendOptions & { confirmDelayMs?: number; backoffMs?: number } = {}): Promise<ConfirmOutcome[]> {
+  const doFetch = opts.fetchImpl ?? fetch
+  const sleep = opts.sleep ?? defaultSleep
+  const accepted = items.filter(i => i.result.ok && i.result.body?.id && !i.result.duplicate)
+  if (!accepted.length) return items.map(i => i.result)
+  await sleep(opts.confirmDelayMs ?? RESEND_CONFIRM_DELAY_MS)
+  const statuses = await Promise.all(items.map(i => (accepted.includes(i) ? readResendStatus(apiKey, String(i.result.body.id), doFetch) : Promise.resolve(null))))
+  const failed = items.filter((_, n) => statuses[n] === 'failed')
+  if (failed.length) await sleep(opts.backoffMs ?? RESEND_FAILED_RETRY_BACKOFF_MS)
+  const out: ConfirmOutcome[] = []
+  for (let n = 0; n < items.length; n++) {
+    const i = items[n]
+    if (statuses[n] !== 'failed') { out.push({ ...i.result, status_after_send: statuses[n] ?? undefined }); continue }
+    const label = (i.label ?? 'resend') + ' retry'
+    console.warn(`[resend] ${i.label ?? 'resend'}: Resend marked ${i.result.body.id} as failed - resending once`)
+    const r = await sendResendEmail(apiKey, i.payload, { ...opts, label, idempotencyKey: i.result.idempotencyKey + ':retry1' })
+    out.push({ ...r, status_after_send: 'failed', retried: true, firstId: String(i.result.body.id) })
+  }
+  return out
 }
