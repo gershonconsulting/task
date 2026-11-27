@@ -67,6 +67,17 @@ CI            : .github/
   conflicted #10, built on main and carrying #8's one-score change).
 
 
+2026-11-27 nightly — daily report "0/6 measures" for 7+ days is a REAL reading; e-mail now names all 6 and why (PR nightly/2026-11-27-task-report-measures, v1.3.9)
+----------------------------------------------------------------
+- Audit: Supabase (read-only) tasks 316 rows, max(created_at) 2026-11-09, max(updated_at) 2026-11-12 14:07 UTC; projects 34, last write 2026-11-09;
+  clients 11, last 2026-09-25. tasks/projects have set_updated_at triggers, so edits do bump updated_at. Route reads the right columns in ET days;
+  316 < 1000-row cap. => nobody entered anything since 2026-11-12: NOT a bug (no wrong field/window/empty query).
+- ✅ E-mail (internal only, oattia@gmail.com + Aina): "What did not move (5 of 6) · 6 of 6 not met" now also lists the unchanged one (Completion %),
+  each measure says when it was last met ("Last task created: 2026-11-09 (16 day(s) before)"), overdue says "met only at 0" + oldest due date,
+  and a Data check line under the score: OK = rows read + last write date; FAILED (red) when a Supabase read errors or returns 0 tasks/projects
+  (before, a failed read looked exactly like 0/6). Read errors also go in the BIG WARNING. Helpers: measureHistory/sinceText/dataCheck in
+  src/lib/dailyReportSummary.ts. scripts/daily-measures-check.ts (new) + all daily/resend checks pass; tsc, next build, next-on-pages pass.
+
 2026-11-17 nightly — internal e-mails: matrix once per week + resend after Resend "failed" (PR nightly/2026-11-17-task-emails, v1.3.8)
 ----------------------------------------------------------------
 - Why 1: 2026-11-16 report@ got the Client Platform Matrix twice. Resend list: 13:00:12 UTC "Client Platform Matrix · W46 · 9–15 Nov 2026"
