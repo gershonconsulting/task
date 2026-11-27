@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { supabaseAdmin } from '@/lib/supabaseServer'
 import { sendResendEmail, retryFailedSends } from '@/lib/resendSend'
-import { summarize, markOf, isQuietDay, overdueCheck, lastChange, canonicalOwner, nyYmd, reportDays } from '@/lib/dailyReportSummary'
+import { summarize, markOf, isQuietDay, overdueCheck, lastChange, canonicalOwner, nyYmd, reportDays, measureHistory, sinceText, dataCheck } from '@/lib/dailyReportSummary'
 import { buildEmail, esc, longDate, type Check, type DayCounts, type Snapshot, type StuckTask } from '@/lib/dailyReportEmail'
 
 // Daily "what happened yesterday" report for Task by Gershon.AI.
@@ -53,7 +53,7 @@ async function handle(req: NextRequest, preview: boolean) {
   if (!secret || auth !== 'Bearer ' + secret) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const supa = supabaseAdmin()
-  const [{ data: projects }, { data: tasks }, { data: clients }, { data: state }] = await Promise.all([
+  const [{ data: projects, error: projectsErr }, { data: tasks, error: tasksErr }, { data: clients, error: clientsErr }, { data: state }] = await Promise.all([
     supa.from('projects').select('id, company_name, status, created_at, updated_at'),
     supa.from('tasks').select('id, name, status, assigned_to, due_date, project_id, created_at, updated_at'),
     supa.from('clients').select('id, name, created_at'),
@@ -63,6 +63,9 @@ async function handle(req: NextRequest, preview: boolean) {
   const allProjects = (projects ?? []) as Project[]
   const allTasks = (tasks ?? []) as Task[]
   const allClients = (clients ?? []) as Client[]
+  // v1.3.9: a failed read used to look exactly like a day with no activity (0/6). Surface it.
+  const readErrors = [['tasks', tasksErr], ['projects', projectsErr], ['clients', clientsErr]]
+    .filter(([, e]) => !!e).map(([n, e]) => n + ': ' + ((e as { message?: string }).message ?? 'error'))
 
   const now = new Date()
   // All three are America/New_York dates; yYmd is the report period (weekend wording keys off it).
@@ -98,14 +101,17 @@ async function handle(req: NextRequest, preview: boolean) {
   // `why` explains a ✗ in plain words; `href` is where to act on it in the app.
   const base = siteUrl()
   const od = overdueCheck(overdue, prev ? prev.overdue : null)
+  // When each measure was last met, so a ✗ says how long it has been (v1.3.9).
+  const hist = measureHistory(allTasks, allProjects, yYmd)
+  const oldestLate = allTasks.filter(t => t.status !== 'completed' && t.due_date && t.due_date < todayYmd).map(t => t.due_date!.slice(0, 10)).sort()[0]
   const checks: Check[] = [
-    { label: 'Projects created', v: y.projectsCreated, p: d.projectsCreated, ok: y.projectsCreated > 0, why: 'No new project was opened.', href: base + '/projects' },
-    { label: 'Tasks created', v: y.tasksCreated, p: d.tasksCreated, ok: y.tasksCreated > 0, why: 'No task was added to any project.', href: base + '/tasks' },
-    { label: 'Tasks completed', v: y.tasksCompleted, p: d.tasksCompleted, ok: y.tasksCompleted > 0, why: 'No task was marked done (' + (tasksTotal - tasksDone) + ' still open).', href: base + '/tasks' },
-    { label: 'Tasks touched', v: y.tasksTouched, p: d.tasksTouched, ok: y.tasksTouched > 0, why: 'No task was edited, re-dated or re-assigned.', href: base + '/tasks' },
-    { label: 'Completion %', v: pct, p: prev ? prev.pct : pct, ok: prev ? pct > prev.pct : false, why: prev && pct < prev.pct ? 'Overall completion went down to ' + pct + '% (from ' + prev.pct + '%).' : 'Overall completion stayed at ' + pct + '% (' + tasksDone + '/' + tasksTotal + ').', href: base + '/dashboard', unchangedIsNeutral: true },
+    { label: 'Projects created', v: y.projectsCreated, p: d.projectsCreated, ok: y.projectsCreated > 0, why: 'No new project was opened.', href: base + '/projects', since: sinceText('project created', hist.projectsCreated, yYmd) },
+    { label: 'Tasks created', v: y.tasksCreated, p: d.tasksCreated, ok: y.tasksCreated > 0, why: 'No task was added to any project.', href: base + '/tasks', since: sinceText('task created', hist.tasksCreated, yYmd) },
+    { label: 'Tasks completed', v: y.tasksCompleted, p: d.tasksCompleted, ok: y.tasksCompleted > 0, why: 'No task was marked done (' + (tasksTotal - tasksDone) + ' still open).', href: base + '/tasks', since: sinceText('task completed', hist.tasksCompleted, yYmd) },
+    { label: 'Tasks touched', v: y.tasksTouched, p: d.tasksTouched, ok: y.tasksTouched > 0, why: 'No task was edited, re-dated or re-assigned.', href: base + '/tasks', since: sinceText('task edit', hist.tasksTouched, yYmd) },
+    { label: 'Completion %', v: pct, p: prev ? prev.pct : pct, ok: prev ? pct > prev.pct : false, why: prev && pct < prev.pct ? 'Overall completion went down to ' + pct + '% (from ' + prev.pct + '%).' : 'Overall completion stayed at ' + pct + '% (' + tasksDone + '/' + tasksTotal + ').', href: base + '/dashboard', unchangedIsNeutral: true, since: 'It rises only when a task is completed. ' + sinceText('task completed', hist.tasksCompleted, yYmd) },
     // ✓ only at 0 overdue: a flat or slightly lower non-zero count is still a red ✗.
-    { label: 'Overdue tasks', v: overdue, p: prev ? prev.overdue : overdue, ok: od.ok, why: od.why, href: base + '/tasks' },
+    { label: 'Overdue tasks', v: overdue, p: prev ? prev.overdue : overdue, ok: od.ok, why: od.why, href: base + '/tasks', since: od.ok ? undefined : 'Met only at 0: complete or re-date them' + (oldestLate ? ' (oldest due ' + oldestLate + ', ' + daysBetween(oldestLate, todayYmd) + ' d late).' : '.') },
   ]
   // Weekend (reported ET day Sat/Sun): not scored, every mark neutral. Unchanged level value: – not ✗.
   const weekend = isQuietDay(yYmd)
@@ -137,9 +143,10 @@ async function handle(req: NextRequest, preview: boolean) {
 
   const warnings: string[] = []
   if (missedRuns > 0) warnings.push('The daily report did not run for ' + missedRuns + ' day(s) — last run was ' + esc(prev!.date) + '. The scheduled job is failing or disabled.')
+  if (readErrors.length) warnings.push('The database read failed (' + esc(readErrors.join('; ')) + '): the measures below may read 0 because of this, not because of inactivity.')
   if (summary.alarm) warnings.push('Nothing moved on ' + longDate(yYmd) + ': no project, task or client was created, updated or completed.' + ' Last change of any kind: ' + lc.text + '.')
 
-  const html = buildEmail({ base, yYmd, y, checks, summary, pct, tasksDone, tasksTotal, overdue, overdueTrend: od.trend, activeProjects, clientsTotal: allClients.length, warnings, lastChangeText: lc.text, stuck })
+  const html = buildEmail({ base, yYmd, y, checks, summary, pct, tasksDone, tasksTotal, overdue, overdueTrend: od.trend, activeProjects, clientsTotal: allClients.length, warnings, lastChangeText: lc.text, stuck, dataCheck: dataCheck({ tasks: allTasks.length, projects: allProjects.length, clients: allClients.length, readErrors, lastChangeYmd: lc.lastYmd }) })
   const subject =
     (warnings.length ? '⚠ ' : '') +
     'Task — Daily report, ' + longDate(yYmd).replace(/^\w+, /, '') + ' — ' +
