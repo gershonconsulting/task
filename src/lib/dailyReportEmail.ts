@@ -1,11 +1,12 @@
 // HTML for the daily "what happened yesterday" e-mail (GC Task). Pure: no Next / Cloudflare
 // imports, so it can be rendered with sample data outside the app (the route passes `base`).
-import type { ReportSummary, Mark } from './dailyReportSummary'
+import type { ReportSummary, Mark, DataCheck } from './dailyReportSummary'
 
 export type Snapshot = { date: string; run_at: string; tasks_total: number; tasks_done: number; projects_total: number; overdue: number; pct: number }
 export type DayCounts = { projectsCreated: number; tasksCreated: number; tasksTouched: number; tasksCompleted: number; clientsAdded: number }
 // `mark` (from markOf) decides ✓ / ✗ / –; without it, `ok` decides ✓ / ✗ as before.
-export type Check = { label: string; v: number; p: number; ok: boolean; why: string; href: string; unchangedIsNeutral?: boolean; mark?: Mark }
+// `since` (v1.3.9): when the measure was last met, e.g. "Last task created: 2026-11-09 (16 day(s) before)."
+export type Check = { label: string; v: number; p: number; ok: boolean; why: string; href: string; unchangedIsNeutral?: boolean; mark?: Mark; since?: string }
 const markOfCheck = (c: Check): Mark => c.mark ?? (c.ok ? 'ok' : 'fail')
 const GREY = '#8a9995'
 export type StuckTask = { name: string; owner: string | null; due: string; daysLate: number; project: string | null; href: string }
@@ -29,18 +30,33 @@ export function buildEmail(a: {
   overdue: number; overdueTrend: string
   activeProjects: number; clientsTotal: number; warnings: string[]; lastChangeText: string
   stuck: StuckTask[]
+  dataCheck?: DataCheck
 }): string {
   const link = 'color:#1f6f5c;text-decoration:underline;'
   // Which of the 6 measures did not move, why, and where to fix it.
   // Weekend days are not scored: nothing in the measures section (or the banner) is red.
   const weekend = !a.summary.scored
   const failed = weekend ? [] : a.checks.filter(c => markOfCheck(c) === 'fail')
-  const failedHtml = failed.length
+  // Measures not met but not ✗ either (unchanged level value, shown as –): named too, so every
+  // measure missing from "x/6" is accounted for in the e-mail.
+  const unchangedList = weekend ? [] : a.checks.filter(c => markOfCheck(c) === 'neutral')
+  const sinceHtml = (c: Check) => c.since ? " <span style='color:#5b6b66;'>" + esc(c.since) + "</span>" : ''
+  const notMet = failed.length + unchangedList.length
+  const unchangedHtml = unchangedList.length
+    ? "<div style='font-size:14px;color:#5b6b66;margin-top:10px;'>Also not met, shown as &ndash; (unchanged, not counted as a fail):</div>" +
+      "<ul style='margin:4px 0 0;padding-left:20px;font-size:14px;color:#1a1a1a;line-height:1.6;'>" +
+      unchangedList.map(c => "<li><b>" + esc(c.label) + "</b> (unchanged) — " + esc(c.why) + sinceHtml(c) + " <a href='" + esc(c.href) + "' style='" + link + "'>Open</a></li>").join('') +
+      "</ul>"
+    : ''
+  const dataHtml = a.dataCheck && !weekend && (a.summary.score < a.checks.length)
+    ? "<div style='font-size:13px;margin-top:12px;padding:10px 12px;border-radius:4px;" + (a.dataCheck.ok ? 'background:#f0f4f3;color:#1d4a3d;' : 'background:#fdecea;color:#8e2318;font-weight:700;') + "'>" + esc(a.dataCheck.text) + "</div>"
+    : ''
+  const failedHtml = notMet
     ? "<div style='background:#ffffff;border-left:5px solid " + RED + ";border-radius:6px;padding:20px 24px;margin-bottom:16px;'>" +
-      "<div style='font-size:16px;font-weight:700;color:#12352c;margin-bottom:10px;'>What did not move (" + failed.length + " of " + a.checks.length + ")</div>" +
+      "<div style='font-size:16px;font-weight:700;color:#12352c;margin-bottom:10px;'>What did not move (" + failed.length + " of " + a.checks.length + ")" + (notMet > failed.length ? " · " + notMet + " of " + a.checks.length + " not met" : '') + "</div>" +
       "<ol style='margin:0;padding-left:20px;font-size:14px;color:#1a1a1a;line-height:1.6;'>" +
-      failed.map(c => "<li><b>" + esc(c.label) + "</b> — " + esc(c.why) + " <a href='" + esc(c.href) + "' style='" + link + "'>Open</a></li>").join('') +
-      "</ol></div>"
+      failed.map(c => "<li><b>" + esc(c.label) + "</b> — " + esc(c.why) + sinceHtml(c) + " <a href='" + esc(c.href) + "' style='" + link + "'>Open</a></li>").join('') +
+      "</ol>" + unchangedHtml + "</div>"
     : ''
   const stuckHtml = a.stuck.length
     ? "<div style='background:#ffffff;border-radius:6px;padding:20px 24px;margin-bottom:16px;'>" +
@@ -119,6 +135,7 @@ export function buildEmail(a: {
       "<th align='center' style='padding:8px 10px;color:#12352c;'>Yesterday</th>" +
       "<th align='center' style='padding:8px 10px;color:#12352c;'>Previous</th>" +
       "<th align='center' style='padding:8px 10px;color:#12352c;'>&nbsp;</th></tr>" + rows + "</table>" +
+      dataHtml +
     "</div>" +
     failedHtml +
     overdueHtml +
