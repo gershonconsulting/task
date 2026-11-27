@@ -152,3 +152,44 @@ export function canonicalOwner(name: string | null, known: Iterable<string | nul
   }
   return longer.size === 1 ? [...longer][0] : n
 }
+
+// v1.3.9 — "why is it 0/6?": for each daily measure, the last America/New_York day (up to the
+// reported day) on which it would have been met. Lets the e-mail say "last task created:
+// 2026-11-09, 16 day(s) before" instead of a bare ✗, so a real lull reads as one.
+export type MeasureHistory = { projectsCreated: string | null; tasksCreated: string | null; tasksCompleted: string | null; tasksTouched: string | null }
+type HistTask = { status: string | null; created_at: string | null; updated_at: string | null }
+type HistProject = { created_at: string | null }
+function lastYmdUpTo(stamps: (string | null | undefined)[], reportedYmd: string): string | null {
+  let best: string | null = null
+  for (const s of stamps) {
+    if (!s) continue
+    const d = new Date(s)
+    if (isNaN(d.getTime())) continue
+    const ymd = nyYmd(d)
+    if (ymd <= reportedYmd && (best === null || ymd > best)) best = ymd
+  }
+  return best
+}
+export function measureHistory(tasks: HistTask[], projects: HistProject[], reportedYmd: string): MeasureHistory {
+  return {
+    projectsCreated: lastYmdUpTo(projects.map(p => p.created_at), reportedYmd),
+    tasksCreated: lastYmdUpTo(tasks.map(t => t.created_at), reportedYmd),
+    // Same rule as the "Tasks completed" count: a completed task whose last update was that day.
+    tasksCompleted: lastYmdUpTo(tasks.filter(t => t.status === 'completed').map(t => t.updated_at), reportedYmd),
+    tasksTouched: lastYmdUpTo(tasks.map(t => t.updated_at), reportedYmd),
+  }
+}
+export function sinceText(what: string, lastYmd: string | null, reportedYmd: string): string {
+  if (!lastYmd) return 'No ' + what + ' on record.'
+  const days = Math.round((Date.parse(reportedYmd + 'T12:00:00Z') - Date.parse(lastYmd + 'T12:00:00Z')) / 86400000)
+  return days === 0 ? 'Last ' + what + ': on the reported day.' : 'Last ' + what + ': ' + lastYmd + ' (' + days + ' day(s) before).'
+}
+
+// Data check shown with the score: proves the report read real rows, so "0/6" means nobody
+// entered anything — or, if a read failed / came back empty, says the score cannot be trusted.
+export type DataCheck = { ok: boolean; text: string }
+export function dataCheck(a: { tasks: number; projects: number; clients: number; readErrors: string[]; lastChangeYmd: string | null }): DataCheck {
+  if (a.readErrors.length) return { ok: false, text: 'Data check FAILED: the database read returned an error (' + a.readErrors.join('; ') + '). Treat this score as a report fault, not as inactivity.' }
+  if (a.tasks === 0 || a.projects === 0) return { ok: false, text: 'Data check FAILED: the report read ' + a.tasks + ' task(s) and ' + a.projects + ' project(s). An empty read makes every measure 0 — treat this score as a report fault, not as inactivity.' }
+  return { ok: true, text: 'Data check OK: the report read ' + a.tasks + ' tasks, ' + a.projects + ' projects and ' + a.clients + ' clients; the last write to any of them was ' + (a.lastChangeYmd ?? 'never') + '. The measures are real readings: a ✗ means nothing was entered in the app, not a report fault.' }
+}
